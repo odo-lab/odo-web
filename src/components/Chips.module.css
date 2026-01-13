@@ -1,0 +1,23 @@
+.chips{
+  display:flex; gap:8px; overflow:auto; padding-bottom:8px;
+  scrollbar-width:none;
+}
+.chips::-webkit-scrollbar{ display:none; }
+
+.chip{
+  flex:0 0 auto;
+  padding:10px 14px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.04);
+  color:var(--muted);
+  font-weight:900;
+  font-size:30px;
+  white-space:nowrap;
+}
+.chip:hover{ background: rgba(255,255,255,.06); color:var(--text); }
+.active{
+  background: rgba(59,130,246,.18);
+  border-color: rgba(59,130,246,.55);
+  color:var(--text);
+}

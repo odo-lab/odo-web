@@ -1,0 +1,132 @@
+/* ===== PlaylistModal styles (TSX 클래스명 기준) ===== */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 80; /* header(50)보다 위 */
+}
+
+.modal {
+  width: min(980px, 100%);
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(15, 17, 23, 0.95);
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+  padding: 18px;
+}
+
+.modal-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.modal-close {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.88);
+  border-radius: 12px;
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.modal-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.modal-body {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 18px;
+  padding-top: 14px;
+}
+
+/* ✅ Image fill을 위한 필수 조건 + 클릭 UX */
+.modal-cover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 18px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* 링크로 감싼 경우에도 동일하게 동작하도록 */
+a.modal-cover {
+  display: block;
+  cursor: pointer;
+}
+
+/* 클릭/호버 피드백(선택) */
+a.modal-cover:hover {
+  filter: brightness(1.03);
+  transform: translateY(-1px);
+  transition: transform 160ms ease, filter 160ms ease;
+}
+
+.modal-info h2 {
+  margin: 0 0 6px;
+  font-size: 26px;
+  font-weight: 900;
+}
+
+.modal-info p {
+  margin: 0 0 12px;
+  color: rgba(255, 255, 255, 0.68);
+  font-weight: 700;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.info-box {
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 14px;
+  padding: 12px 12px;
+}
+
+.info-box b {
+  display: block;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.62);
+  margin-bottom: 6px;
+}
+
+.info-box span {
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.90);
+}
+
+/* 반응형 */
+@media (max-width: 820px) {
+  .modal-body {
+    grid-template-columns: 1fr;
+  }
+
+  .modal {
+    padding: 16px;
+  }
+
+  .modal-cover {
+    aspect-ratio: 16 / 9;
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,0 +1,58 @@
+.cardLink {
+  text-decoration: none;
+  color: inherit;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #111;
+  border: 1px solid #222;
+}
+
+.cover {
+  position: relative;
+  aspect-ratio: 16 / 9;
+}
+
+.coverImg {
+  object-fit: cover;
+}
+
+.body {
+  padding: 14px;
+}
+
+.title {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.tags {
+  font-size: 12px;
+  color: #999;
+}
+
+.metaRow {
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.meta {
+  font-size: 12px;
+  color: #aaa;
+}
+
+.detailBtn {
+  padding: 6px 10px;
+  font-size: 12px;
+  border-radius: 10px;
+  border: 1px solid #333;
+  background: #1a1a1a;
+  color: #fff;
+}

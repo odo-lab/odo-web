@@ -1,0 +1,263 @@
+.header{
+  position:sticky;
+  top:0;
+  z-index:50;
+  backdrop-filter: blur(10px);
+  background: rgba(11,12,16,.72);
+  border-bottom:1px solid rgba(31,35,48,.75);
+}
+
+/* =========================
+   HEADER LAYOUT
+========================= */
+
+.inner{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  height:64px;
+  gap:16px;
+}
+
+/* =========================
+   BRAND
+========================= */
+
+.brand{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  font-weight:900;
+  letter-spacing:.3px;
+}
+
+.badge{
+  width:34px;
+  height:34px;
+  border-radius:10px;
+
+  position: relative;          /* ✅ fill 쓰려면 필수 */
+  overflow: hidden;            /* ✅ 라운드 안쪽으로 자르기 */
+  flex: 0 0 auto;
+
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.14);
+  box-shadow: 0 12px 30px rgba(0,0,0,.35);
+}
+.badge img{
+  width:22px;
+  height:22px;
+  object-fit: contain;
+}
+.logo{
+  width:40px;
+  height:40px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex: 0 0 auto;
+}
+
+.logo img{
+  width:100%;
+  height:100%;
+  object-fit: contain;
+}
+
+/* 🔑 ODO + onedayofmusic 세로 중앙 정렬 핵심 */
+.brandText{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  line-height:1.05;
+  transform: translateY(-1px); /* 시각적 중심 보정 */
+}
+
+.brandTop{ font-size:15px; }
+.brandSub{
+  font-size:12px;
+  color:var(--muted);
+  font-weight:700;
+}
+
+/* =========================
+   NAVIGATION
+========================= */
+
+.nav{
+  display:flex;
+  align-items:center;
+  gap:18px;
+  color:var(--muted);
+  font-weight:700;
+}
+
+.nav a{
+  padding:10px 12px;
+  border-radius:10px;
+  line-height:1;            /* 🔑 텍스트 기준선 정렬 */
+  display:flex;
+  align-items:center;      /* 🔑 메뉴 높이 통일 */
+}
+
+.nav a:hover{
+  color:var(--text);
+  background: rgba(255,255,255,.04);
+}
+
+/* =========================
+   RIGHT AREA
+========================= */
+
+.right{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.btn{
+  padding:10px 14px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.04);
+  font-weight:800;
+}
+
+.btn:hover{
+  border-color: rgba(255,255,255,.18);
+  background: rgba(255,255,255,.06);
+}
+
+.primary{
+  background: linear-gradient(135deg, var(--brand), #2563eb);
+  border-color: rgba(59,130,246,.55);
+}
+
+/* =========================
+   STATUS PILL
+========================= */
+
+.pill{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 12px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.04);
+  color:var(--muted);
+  font-weight:800;
+  font-size:13px;
+}
+
+.dot{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  background: var(--good);
+}
+
+/* =========================
+   HAMBURGER / MOBILE
+========================= */
+
+.hamburger{
+  display:none;
+  padding:10px 12px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.04);
+}
+
+.mobileMenu{
+  padding:12px 0 18px;
+  border-top:1px solid rgba(31,35,48,.75);
+}
+
+.mobileMenu a{
+  display:block;
+  padding:12px 10px;
+  border-radius:12px;
+  color:var(--muted);
+  font-weight:800;
+}
+
+.mobileMenu a:hover{
+  background: rgba(255,255,255,.04);
+  color:var(--text);
+}
+/* 스크롤 다운 시 위로 슬라이드되어 숨김 */
+.header{
+  transition: transform 220ms ease, opacity 220ms ease;
+  will-change: transform;
+}
+
+.headerHidden{
+  transform: translateY(-110%);
+  opacity: 0.98;
+}
+/* ✅ 모바일 오버레이 딤(배경) */
+.mobileDim{
+  position: fixed;
+  inset: 0;
+  z-index: 60; /* header(50)보다 위 */
+  background: rgba(0,0,0,.35);
+  backdrop-filter: blur(6px);
+  border: 0;
+  padding: 0;
+}
+
+/* ✅ 모바일 메뉴 패널(겹쳐서 뜨는 영역) */
+.mobilePanel{
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  top: 72px;              /* 헤더 아래로 살짝 띄움 (헤더 높이에 맞춰 조정) */
+  z-index: 61;
+
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(11,12,16,.86);
+  box-shadow: 0 18px 60px rgba(0,0,0,.55);
+
+  padding: 12px;
+}
+
+/* 메뉴 링크 스타일 */
+.mobilePanel a{
+  display:block;
+  padding: 12px 12px;
+  border-radius: 14px;
+  color: rgba(255,255,255,.86);
+  font-weight: 800;
+}
+
+.mobilePanel a:hover{
+  background: rgba(255,255,255,.06);
+  color: rgba(255,255,255,.95);
+}
+
+/* 활성 메뉴 강조(선택 사항) */
+.mobilePanel a:active{
+  transform: translateY(1px);
+}
+
+/* ✅ 모바일에서만 의미 있게 (데스크탑에서는 nav가 있으니) */
+@media (min-width: 821px){
+  .mobileDim{ display:none; }
+  .mobilePanel{ display:none; }
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 820px){
+  .nav{ display:none; }
+  .hamburger{ display:inline-flex; }
+  .inner{ height:60px; }
+}
+
+@media (max-width: 520px){
+  .primary{ display:none; }
+}
