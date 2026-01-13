@@ -1,4 +1,5 @@
 import { FAQS } from "@/lib/faqs";
+export const dynamic = "force-dynamic";
 
 export default function Page({ params }: { params: { id: string } }) {
   const raw = decodeURIComponent(String(params?.id ?? "")).trim();
