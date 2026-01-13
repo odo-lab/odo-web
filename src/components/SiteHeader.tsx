@@ -89,8 +89,8 @@ export default function SiteHeader() {
               O.D.O 서비스란?
             </Link>
             <Link
-              href="/faq"
-              style={isActive("/faq") ? { color: "var(--text)", background: "rgba(255,255,255,.04)" } : undefined}
+              href="/howto"
+              style={isActive("/howto") ? { color: "var(--text)", background: "rgba(255,255,255,.04)" } : undefined}
             >
               이용 방법 / FAQ
             </Link>
