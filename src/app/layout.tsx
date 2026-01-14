@@ -1,6 +1,7 @@
 import "./globals.css";
 import SiteHeader from "@/components/SiteHeader";
 
+import SiteFooter from "@/components/SiteFooter";
 export const metadata = {
   title: "ODO - 매장용 플레이리스트",
   description: "점주 운영형 플레이리스트 선택 콘솔 (Prototype)",
@@ -38,6 +39,8 @@ export default function RootLayout({
       <body>
         <SiteHeader />
         <main className="container main">{children}</main>
+        
+        <SiteFooter />
       </body>
     </html>
   );

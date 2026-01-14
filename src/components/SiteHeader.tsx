@@ -100,8 +100,13 @@ export default function SiteHeader() {
             >
               플레이리스트
             </Link>
-            <Link href="/test2"style={isActive("/test2") ? { color: "var(--text)", background: "rgba(255,255,255,.04)" } : undefined}
-            >LAST.FM 설치 가이드</Link>
+            <a
+              href="https://www.youtube.com/@Grapeskr/videos"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              음원 체험하기
+            </a>
               
             <a
               href="https://docs.google.com/forms/d/e/1FAIpQLSf0yLS-x-d6LwdpYxA4G2k3V6xDYsAQR_rU13lNxZSwybKD6g/viewform"
@@ -140,11 +145,16 @@ export default function SiteHeader() {
 
             {/* ✅ 메뉴 패널(겹쳐서 뜸) */}
             <div className={styles.mobilePanel} role="dialog" aria-modal="true">
-              <Link href="/howto" onClick={() => setOpen(false)}>O.D.O 서비스란?</Link>
-              <Link href="/help" onClick={() => setOpen(false)}>이용 방법 / FAQ</Link>
+              <Link href="/test2" onClick={() => setOpen(false)}>O.D.O 서비스란?</Link>
+              <Link href="/howto" onClick={() => setOpen(false)}>이용 방법 / FAQ</Link>
               <Link href="/playlists" onClick={() => setOpen(false)}>플레이리스트</Link>
-              <Link href="/help" onClick={() => setOpen(false)}>LAST.FM 설치 가이드</Link>
-
+              <a
+              href="https://www.youtube.com/@Grapeskr/videos"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              음원 체험하기
+            </a>
               <a
                 href="https://docs.google.com/forms/d/e/1FAIpQLSf0yLS-x-d6LwdpYxA4G2k3V6xDYsAQR_rU13lNxZSwybKD6g/viewform"
                 target="_blank"
