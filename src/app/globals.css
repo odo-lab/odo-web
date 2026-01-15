@@ -513,9 +513,9 @@ main{ padding:28px 0 56px; }
 }
 .section-title{ margin:0; font-size:24px; letter-spacing:-.2px; }
 .section-desc{ margin:0; color:var(--muted); font-size:17px; }
-
 /* Event Banner */
 .eb { margin: 18px 0 24px; }
+
 .ebShell{
   position: relative;
   border-radius: 22px;
@@ -531,16 +531,25 @@ main{ padding:28px 0 56px; }
   color: inherit;
 }
 
+/* ✅ 배너 높이: 3단계 반응형 */
 .ebMedia{
   position: relative;
-  height: 220px; /* 데스크탑 기본 */
+  height: 240px; /* 데스크톱 기본(1101px 이상) */
+}
+
+@media (max-width: 1100px){
+  .ebMedia{ height: 200px; } /* 태블릿 */
+}
+
+@media (max-width: 820px){
+  .ebMedia{ height: 150px; } /* 모바일 */
+  .ebNav{ width: 40px; height: 40px; }
 }
 
 .ebOverlay{
   position:absolute; inset:0;
   background: radial-gradient(1200px 300px at 70% 50%, rgba(0,0,0,.15), rgba(0,0,0,.55));
 }
-
 
 .ebNav{
   position:absolute;
@@ -569,6 +578,7 @@ main{ padding:28px 0 56px; }
 
 .ebPrev{ left: 14px; }
 .ebNext{ right: 14px; }
+
 .ebDots{
   position:absolute;
   left: 50%;
@@ -675,6 +685,18 @@ main{ padding:28px 0 56px; }
 .carousel, .carousel a{
   -webkit-user-drag: none;
 }
+/* 카드/썸네일은 버튼 absolute 기준이 되도록 */
+.g-card, .p-card { position: relative; }
+
+/* 썸네일은 Image(fill) 기준 */
+.g-thumb, .thumb { position: relative; overflow: hidden; }
+
+/* next/image(fill)이 버튼 클릭을 먹지 않게 */
+.thumb-img { pointer-events: none; }
+
+/* 상세 버튼은 최상단 레이어 */
+.info-btn { position: absolute; top: 12px; right: 12px; z-index: 20; }
+
 /* 카드 hover 반응 */
 .p-card,
 .g-card{

@@ -97,8 +97,11 @@ return (
         <PlaylistCard key={p.id} p={p} mode="grid" onOpenDetail={openDetail} />
       ))} 
     </div>
-
-    ...
+          <PlaylistModal
+      open={open}
+      playlist={selected}
+      onClose={() => setOpen(false)}
+      />
   </>
 );
 

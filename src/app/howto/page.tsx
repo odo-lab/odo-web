@@ -360,7 +360,7 @@ export default function HowtoPage() {
           target="_blank"
           rel="noreferrer"
         >
-          https://pf.kakao.com/_xeuxjxjn/chat
+          카카오톡 문의하기
         </a>
       </div>
     </div>
@@ -378,13 +378,15 @@ const faqQStyle: CSSProperties = {
   fontWeight: 800,
   letterSpacing: -0.2,
   color: "rgba(255,255,255,.95)",
+  
+  lineHeight: 2,
 };
 
 const faqAStyle: CSSProperties = {
   margin: "0 0 8px",
   color: "rgba(255,255,255,.78)",
   fontSize: 13.5,
-  lineHeight: 1.7,
+  lineHeight: 2,
   fontWeight: 500,
 };
 
@@ -392,6 +394,8 @@ const faqAStyle: CSSProperties = {
 const stackStyle: CSSProperties = {
   display: "grid",
   gap: 24, // 카드 사이 간격
+  
+  lineHeight: 2,
 };
 const installTextStyle: CSSProperties = {
   marginBottom: 8,
@@ -399,12 +403,16 @@ const installTextStyle: CSSProperties = {
   fontWeight: 900,
   letterSpacing: -0.3,
   color: "rgba(255,255,255,.95)",
+  
+  lineHeight: 2,
 };
 
 const cardStyle: CSSProperties = {
   padding: "22px 18px",
   borderRadius: 18,
   scrollMarginTop: 50, // 네비 클릭 이동 시 상단 가림 방지(보조)
+  
+  lineHeight: 2,
 };
 
 const h2Style: CSSProperties = {
@@ -412,6 +420,8 @@ const h2Style: CSSProperties = {
   fontSize: 18,
   fontWeight: 950,
   letterSpacing: -0.4,
+  
+  lineHeight: 2,
 };
 
 const h3Style: CSSProperties = {
@@ -419,13 +429,15 @@ const h3Style: CSSProperties = {
   fontSize: 15,
   fontWeight: 900,
   letterSpacing: -0.2,
+  
+  lineHeight: 2,
 };
 
 const pStyle: CSSProperties = {
   margin: "0 0 10px",
   color: "rgba(255,255,255,.78)",
   fontSize: 15,
-  lineHeight: 1.75,
+  lineHeight: 2,
   fontWeight: 650,
 };
 
@@ -434,19 +446,23 @@ const listUlStyle: CSSProperties = {
   paddingLeft: 18,
   color: "rgba(255,255,255,.78)",
   fontSize: 13.5,
-  lineHeight: 1.75,
+  lineHeight: 2,
   fontWeight: 650,
 };
 
 const bStyle: CSSProperties = {
   color: "rgba(255,255,255,.92)",
   fontWeight: 900,
+  
+  lineHeight: 2,
 };
 
 const hrStyle: CSSProperties = {
   border: "none",
   borderTop: "1px solid rgba(255,255,255,.06)",
   margin: "18px 0",
+  
+  lineHeight: 2,
 };
 
 const sectionStyle: CSSProperties = {
@@ -459,6 +475,8 @@ const boxStyle: CSSProperties = {
   border: "1px solid rgba(255,255,255,.08)",
   background: "rgba(255,255,255,.03)",
   padding: 14,
+  
+  lineHeight: 2,
 };
 
 /* ===== 네비 스타일 (Privacy 페이지 톤에 맞춘 “깔끔한 바”) ===== */
