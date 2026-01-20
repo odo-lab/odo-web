@@ -1,0 +1,261 @@
+/* app/landing/page.module.css */
+
+/* ===== 전체 구조 유지용 Stage ===== */
+.page{
+  min-height: 100vh;
+  background:#0b0c10;
+  color:#fff;
+}
+
+/* ✅ 화면이 작아지면 가로 스크롤만 생김(세로로 쌓지 않음) */
+.stageScroll{
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* ✅ 이 폭 이하로는 레이아웃을 줄이지 않고 스크롤로 유지 */
+.stage{
+  min-width: 1100px;           /* 구조 기준 폭: 1024~1200 중 선택 */
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+/* (선택) 스크롤바 보기 싫으면 */
+.stageScroll::-webkit-scrollbar{ height: 10px; }
+.stageScroll::-webkit-scrollbar-thumb{ background: rgba(255,255,255,.12); border-radius: 999px; }
+.stageScroll::-webkit-scrollbar-track{ background: rgba(255,255,255,.06); }
+
+/* ===== HERO ===== */
+.heroSection{ padding-top: 40px; }
+
+.heroCard{
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,.10);
+  background: rgba(255,255,255,.05);
+}
+
+.heroImg{
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+.heroImg{
+  width: 100%;
+  height: 100%;
+  object-fit: contain;       /* ✅ 절대 비율 안 무너짐 + 안 잘림 */
+  object-position: center;
+  background: #000;          /* 남는 공간(레터박스) 채움 */
+  display: block;
+}
+.heroDim{
+  position:absolute;
+  inset:0;
+  background: rgba(0,0,0,.20);
+}
+
+/* ===== STATEMENT ===== */
+.statementSection{
+  padding: clamp(56px, 6vw, 96px) 0;
+}
+
+.statementStage{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  padding: 0 16px;
+  min-height: 22vh;
+}
+
+.statementInner{
+  width: 100%;
+  max-width: 720px;
+  text-align: center;
+}
+
+.h2{
+  margin:0;
+  font-size: clamp(28px, 3vw, 36px);
+  line-height:1.25;
+  font-weight:900;
+  letter-spacing:-0.6px;
+}
+
+.strike{
+  opacity:.6;
+  text-decoration: line-through;
+  text-decoration-color: rgba(255,255,255,.30);
+  text-decoration-thickness: 1px;
+}
+
+.accent{ color:#60a5fa; }
+
+.desc{
+  margin: 18px 0 0;
+  font-size: clamp(14px, 1.6vw, 18px);
+  line-height: 1.7;
+  color: rgba(255,255,255,.70);
+}
+
+/* ===== 공용 Pill ===== */
+/* ✅ 기존 .pill 기본값을 clamp로 바꾸기 */
+.pill{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:999px;
+
+  /* 화면 줄면 자동 축소 */
+  padding: clamp(8px, 1.2vw, 12px) clamp(12px, 2vw, 18px);
+  font-size: clamp(12px, 1.3vw, 16px);
+  font-weight: 800;
+
+  user-select:none;
+  background:#fff;
+  color:#000;
+  box-shadow: 0 10px 30px rgba(0,0,0,.35);
+
+  white-space: nowrap;          /* ✅ 줄바꿈 금지 */
+}
+
+/* ✅ benefit pill 고정폭을 유동폭으로 */
+.pillEqual{
+  width: clamp(160px, 22vw, 260px);
+  justify-content:center;
+}
+
+
+/* ===== 혜택 2개(항상 2열 유지) ===== */
+.benefitWrap{
+  margin: clamp(28px, 6vw, 64px) auto 0;
+  padding: 0 16px;
+}
+
+.benefitGrid{
+  display:grid;
+  grid-template-columns: 1fr 1fr;        /* ✅ 절대 1열로 안 바뀜 */
+  align-items:center;
+  justify-items:center;
+  gap: clamp(28px, 6vw, 116px);          /* ✅ 줄어들면 간격만 줄임 */
+}
+
+
+/* ===== Problem(항상 2열 유지) ===== */
+.spacer{ height: clamp(56px, 7vw, 128px); }
+
+.h3{
+  margin:0;
+  font-size: clamp(20px, 2.2vw, 26px);
+  line-height:1.25;
+  font-weight:900;
+  letter-spacing:-0.4px;
+}
+.problemGrid{
+  display:grid;
+  grid-template-columns: 1fr 1fr;        /* ✅ 절대 1열로 안 바뀜 */
+  gap: clamp(24px, 5vw, 80px);
+  align-items :center;
+}
+
+
+.problemTitle {
+  width: fit-content;        /* ✅ 제목 덩어리를 하나의 블록으로 */
+  margin-left: auto;
+  margin-right: auto;        /* ✅ 그 블록을 가운데로 */
+  text-align: left;          /* ✅ 내부 텍스트는 왼쪽 정렬 유지 */
+}
+
+.problemList {
+  margin: 0;
+  padding-left: 18px;           /* 기존 들여쓰기 유지 */
+  list-style-position: outside; /* 기본값 */
+  text-align: left;             /* ✅ 각 줄은 왼쪽 정렬 유지 */
+
+  /* ✅ 리스트 “덩어리”만 가운데로 */
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+
+  color: rgba(255,255,255,.82);
+  line-height: 1.8;
+  font-size: clamp(14px, 1.4vw, 18px);
+  font-weight: 700;
+}
+
+
+.closing{
+  padding-top: clamp(48px, 7vw, 96px);
+  text-align:center;
+  font-size: clamp(18px, 2.1vw, 25px);
+  font-weight:800;
+  color:#fff;
+  margin-bottom: clamp(48px, 7vw, 96px);;
+}
+
+/* ===== 3개 라벨(항상 3분할 유지) ===== */
+
+
+/* 작은 pill */
+/* 작은 pill은 더 작게 반응형으로 */
+.pillsm{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:999px;
+
+  padding: clamp(7px, 1vw, 10px) clamp(10px, 1.6vw, 16px);
+  font-size: clamp(12px, 1.2vw, 16px);
+  font-weight: 800;
+
+  user-select:none;
+  background:#fff;
+  color:#000;
+  box-shadow: 0 10px 30px rgba(0,0,0,.35);
+
+  white-space: nowrap;          /* ✅ 줄바꿈 금지 */
+}
+
+/* 3분할 유지하는 레이아웃이라면 gap도 반응형으로 */
+.pillStage{
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(10px, 2.2vw, 40px);
+  align-items:center;
+  justify-items:center;
+  margin-top: 28px;
+  height: 90px;
+}
+
+/* 기본(데스크탑): 줄바꿈 안 함 */
+.br{ display:none; }
+
+/* 모바일/좁은 화면: 줄바꿈 켬 */
+@media (max-width: 820px){
+  .br{ display:inline; }
+}
+
+
+.ytEmbed {
+  width: min(80%, 1280px);
+  margin: 0 auto;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ytRatio {
+  position: relative;
+  width: 100%;
+  padding-top: 56.25%;
+}
+
+.ytRatio iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}

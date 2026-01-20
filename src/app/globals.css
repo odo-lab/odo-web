@@ -1154,6 +1154,23 @@ footer{
   .bt-grid{ grid-template-columns: 1fr; gap: 14px; }
   .bt-image{ height: 180px; }
 }
+.pillRow{
+  display: grid;
+  grid-template-columns: repeat(2, 260px);
+  gap: 18px;
+  justify-content: center; /* 전체를 가운데 */
+}
+
+@media (max-width: 700px){
+  .pillRow{
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+}
+.pillCell{
+  display: flex;
+  justify-content: center;
+}
 
 main.container{
   padding-top: 30px; /* 기본 */

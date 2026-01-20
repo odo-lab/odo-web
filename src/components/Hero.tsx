@@ -1,13 +1,14 @@
-// app/components/Hero.tsx (경로는 편한 곳에 두고 import 하세요)
+// src/components/Hero.tsx
 "use client";
 
 import styles from "./Hero.module.css";
-import VinylFloat from "@/components/VinylFloat";
 
 export default function Hero() {
   return (
     <section className={styles.wrapper}>
       <div className={styles.hero}>
+        {/* LP 오버레이: hero(기준 박스) 위에 absolute로 깔림 */}
+
         <div className={styles.heroText}>
           <h1 className={styles.h1}>
             틀기만 해도 포인트가 쌓이는
@@ -32,7 +33,6 @@ export default function Hero() {
               FAQ / 운영가이드
             </button>
           </div>
-
         </div>
       </div>
     </section>

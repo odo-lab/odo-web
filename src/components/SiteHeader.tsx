@@ -83,8 +83,8 @@ export default function SiteHeader() {
           {/* Main Navigation */}
           <nav className={styles.nav} aria-label="Main">
             <Link
-              href="/test1"
-              style={isActive("/test1") ? { color: "var(--text)", background: "rgba(255,255,255,.04)" } : undefined}
+              href="/landing"
+              style={isActive("/landing") ? { color: "var(--text)", background: "rgba(255,255,255,.04)" } : undefined}
             >
               O.D.O 서비스란?
             </Link>
@@ -145,7 +145,7 @@ export default function SiteHeader() {
 
             {/* ✅ 메뉴 패널(겹쳐서 뜸) */}
             <div className={styles.mobilePanel} role="dialog" aria-modal="true">
-              <Link href="/test2" onClick={() => setOpen(false)}>O.D.O 서비스란?</Link>
+              <Link href="/landing" onClick={() => setOpen(false)}>O.D.O 서비스란?</Link>
               <Link href="/howto" onClick={() => setOpen(false)}>이용 방법 / FAQ</Link>
               <Link href="/playlists" onClick={() => setOpen(false)}>플레이리스트</Link>
               <a
