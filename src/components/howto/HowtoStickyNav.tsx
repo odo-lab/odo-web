@@ -2,7 +2,7 @@
 
 import React from "react";
 
-export type SectionId = "howto" | "lastfm" | "faq";
+export type SectionId = "howto" | "lastfm" | "faq" | "contact";
 
 export type NavItem = {
   id: SectionId;
@@ -13,40 +13,32 @@ type Props = {
   items: NavItem[];
   activeId: SectionId;
   onClick: (id: SectionId) => void;
-
-  // ✅ 추가: SiteHeader 높이만큼 아래에 sticky 붙이기
-  topOffset?: number;
+  /** SiteHeader 아래에 붙이기 위한 동적 top(px) */
+  topPx: number;
 };
 
-export default function HowtoStickyNav({
-  items,
-  activeId,
-  onClick,
-  topOffset = 0,
-}: Props) {
+export default function HowtoStickyNav({ items, activeId, onClick, topPx }: Props) {
   return (
     <div
-      className="sticky z-50 border-b border-white/10 bg-black/70 backdrop-blur"
-      style={{ top: topOffset }}
+      style={{ top: topPx }}
+      className="
+        fixed left-0 right-0 z-40
+        border-b border-neutral-200/70 bg-white/85 backdrop-blur
+      "
     >
-      <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-6">
-        <span className="text-xs font-semibold tracking-widest text-white/60">
-          HOW TO
-        </span>
-
-        <nav className="flex items-center gap-1">
+      <div className="mx-auto max-w-6xl px-4">
+        <nav className="flex gap-2 py-2">
           {items.map((it) => {
-            const active = activeId === it.id;
+            const isActive = it.id === activeId;
             return (
               <button
                 key={it.id}
                 type="button"
                 onClick={() => onClick(it.id)}
                 className={[
-                  "rounded-full px-4 py-2 text-sm font-medium transition",
-                  active
-                    ? "bg-white/10 text-white"
-                    : "text-white/70 hover:bg-white/5",
+                  "rounded-full px-3 py-2 text-sm transition",
+                  "hover:bg-neutral-100",
+                  isActive ? "bg-neutral-900 text-white hover:bg-neutral-900" : "text-neutral-700",
                 ].join(" ")}
               >
                 {it.label}

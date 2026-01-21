@@ -520,7 +520,7 @@ const navBtnStyle: CSSProperties = {
   background: "transparent",
   color: "rgba(255,255,255,.72)",
   fontWeight: 850,
-  fontSize: 12.5,
+  fontSize: 12,
   padding: "8px 10px",
   borderRadius: 999,
   cursor: "pointer",

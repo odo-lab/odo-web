@@ -16,6 +16,10 @@
   white-space:nowrap;
 }
 
+.chip:hover{
+  background: rgba(255,255,255,.06);
+}
+
 .active{
   background: rgba(59,130,246,.18);
   border-color: rgba(59,130,246,.55);

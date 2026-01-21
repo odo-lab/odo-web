@@ -359,6 +359,7 @@ button{ font:inherit; color:inherit; background:none; border:none; cursor:pointe
   background: rgba(255,255,255,.04);
   color:var(--text);
   font-weight:700;
+  font-size: clamp(13px, 1.1vw, 16px);
 }
 .btn:hover{ border-color: rgba(255,255,255,.18); background: rgba(255,255,255,.06); }
 .btn-primary{
@@ -511,8 +512,8 @@ main{ padding:28px 0 56px; }
   display:flex; align-items:flex-end; justify-content:space-between;
   gap:10px; margin-bottom:12px;
 }
-.section-title{ margin:0; font-size:24px; letter-spacing:-.2px; }
-.section-desc{ margin:0; color:var(--muted); font-size:17px; }
+.section-title{ margin:0; font-size: clamp(20px, 1.1vw, 24px);; letter-spacing:-.2px; }
+.section-desc{ margin:0; color:var(--muted); font-size: clamp(14px, 1.1vw, 17px); }
 /* Event Banner */
 .eb { margin: 18px 0 24px; }
 
@@ -722,7 +723,7 @@ main{ padding:28px 0 56px; }
   background: transparent;
   padding: 36px 0 42px;
   color: rgba(255,255,255,.65);
-  font-size: 12.5px;
+  font-size: clamp(10px, 1.1vw, 13px);
 }
 
 .legal-top{
@@ -957,7 +958,7 @@ footer{
   background: rgba(0,0,0,.22);
   padding:22px 0;
   color:var(--muted);
-  font-size:13px;
+  font-size: clamp(10px, 1.1vw, 13px);
   margin-top:34px;
 }
 .footer-row{ display:flex; justify-content:space-between; gap:14px; flex-wrap:wrap; }
