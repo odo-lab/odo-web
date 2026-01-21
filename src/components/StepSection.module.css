@@ -1,0 +1,102 @@
+.wrap{
+  padding: clamp(28px, 4.2vw, 56px) 0;
+}
+
+.container{
+  width: min(720px, calc(100% - 32px));
+  margin: 0 auto;
+}
+.tipCard{
+  border-radius: 14px;
+  padding: 18px 20px;
+  background: rgba(255,255,255,.10);
+  border: 1px solid rgba(255,255,255,.10);
+  box-shadow: 0 18px 60px rgba(0,0,0,.35);
+  margin-bottom: 18px;
+  width: 100%;
+  max-width: 720px;
+}
+
+
+.tipKicker{
+  font-size: 12px;
+  color: rgba(255,255,255,.68);
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.tipTitle{
+  font-size: clamp(14px, 1.6vw, 18px);
+  font-weight: 900;
+  color: rgba(255,255,255,.92);
+  line-height: 1.25;
+}
+
+.grid{
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* ✅ 구조 유지: 위아래로 쌓이지 않음 */
+  gap: 14px;
+  align-items: stretch;
+}
+
+.leftCol{
+  display: grid;
+  gap: 12px;
+}
+
+.stepCard{
+  padding: 18px 18px;                         /* 14/16 → 18/18 */
+  min-height: clamp(86px, 8.8vw, 112px);
+  border-radius: 14px;
+  background: rgba(255,255,255,.10);
+  border: 1px solid rgba(255,255,255,.10);
+  box-shadow: 0 14px 40px rgba(0,0,0,.30);
+}
+
+.stepNo{
+  font-size: 14px;
+  letter-spacing: .2px;
+  font-weight: 900;
+  color: rgba(96,165,250,.95);
+  margin-bottom: 8px;
+}
+
+.stepTitle{
+  font-weight: 900;
+  color: rgba(255,255,255,.92);
+  font-size: clamp(14px, 1.7vw, 18px);         /* 13~16 → 14~18 */
+  line-height: 1.25;
+}
+
+.rightCard{
+  border-radius: 16px;
+  background: rgba(255,255,255,.10);
+  border: 1px solid rgba(255,255,255,.10);
+  box-shadow: 0 18px 60px rgba(0,0,0,.35);
+  overflow: hidden;
+  min-height: clamp(220px, 26vw, 300px);
+}
+
+.rightMedia{
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.rightImg{
+  object-fit: cover;           /* ✅ 이미지 꽉 채우기 */
+  object-position: center;     /* 필요하면 focus 조정 */
+}
+
+/* 너무 좁을 때도 2컬럼 유지하되, 글/패딩만 줄여서 버팀 */
+@media (max-width: 520px){
+  .grid{ gap: 10px; }
+ .tipCard{ padding: 18px 16px; }
+  .stepCard{ padding: 14px 14px; }
+  .rightCard{ min-height: 240px; } /* 과도하게 커지지 않게 */
+}
+.br{ display:none; }
+
+@media (max-width: 520px){
+  .br{ display:inline; } /* 줄바꿈만 보이게 */
+}

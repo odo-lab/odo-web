@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import React from "react";
 import styles from "./page.module.css";
+import StepSection from "@/components/StepSection";
+
 
 export const metadata: Metadata = {
   title: "ODO | 랜딩",
@@ -146,8 +148,63 @@ export default function LandingPage() {
             <span className={`${styles.pillsm} ${styles.p2}`}>광고 없음</span>
             <span className={`${styles.pillsm} ${styles.p3}`}>저작권 클리어</span>
           </div>
+          <StepSection rightImageSrc="/images/pos.png" />
+          {/* FAQ */}
+          <section className={styles.faqSection} aria-label="자주 묻는 질문">
+            <div className={styles.faqInner}>
+              <h2 className={styles.faqTitle}>자주 묻는 질문</h2>
 
+              <div className={styles.faqList}>
+                <article className={styles.faqCard}>
+                  <div className={styles.faqQRow}>
+                    <span className={styles.faqQ}>Q.</span>
+                    <h3 className={styles.faqQText}>음악을 틀면 비용이 더 발생하나요?</h3>
+                  </div>
+                  <p className={styles.faqAText}>
+                    아니요. 추가 비용 없이, 재생된 만큼 정산금을 받습니다.
+                  </p>
+                </article>
+
+                <article className={styles.faqCard}>
+                  <div className={styles.faqQRow}>
+                    <span className={styles.faqQ}>Q.</span>
+                    <h3 className={styles.faqQText}>얼마나 받을 수 있나요?</h3>
+                  </div>
+                  <p className={styles.faqAText}>
+                    월 최대 약 3만원 수준입니다.
+                  </p>
+                </article>
+              </div>
+
+              <div className={styles.faqCtaRow}>
+                <Link className={styles.faqBtn} href="/howto">
+                  FAQ 더 보기
+                </Link>
+              </div>
+            </div>
+          </section>
+          <div className={styles.statementStage}>
+              <div className={styles.statementInner}>
+                <h2 className={styles.h2}>
+                  매장 음악을
+                  <br />
+                  불편 없이 정리하고
+                  <br />
+                  틀어준 만큼 돌려받으세요
+                </h2>
+              </div>
+            </div>
           <div id="cta" style={{ height: 1 }} />
+          <div className={styles.applyCtaRow}>
+                <a
+                  className={styles.applyBtn}
+                  href="https://docs.google.com/forms/d/e/1FAIpQLSf0yLS-x-d6LwdpYxA4G2k3V6xDYsAQR_rU13lNxZSwybKD6g/viewform"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  ODO 무료로 시작하기
+                </a>
+          </div>
         </main>
       </div>
     </div>
