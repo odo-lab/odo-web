@@ -1,52 +1,73 @@
-// src/lib/auth-context.tsx
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-import { onAuthStateChanged, User, signOut as firebaseSignOut } from "firebase/auth";
-import { auth, db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
-import { useRouter } from "next/navigation";
-
-// 유저 권한 타입 정의 (admin, user, super 등)
-type UserRole = "admin" | "user" | "super" | null;
+import { auth, db } from "./firebase";
+import { onAuthStateChanged, User, signOut } from "firebase/auth"; // signOut 추가됨
+import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 
 interface AuthContextType {
   user: User | null;
-  role: UserRole;
+  role: string | null;
   loading: boolean;
-  logout: () => Promise<void>;
+  logout: () => Promise<void>; // ✅ 여기에 logout 함수 타입 정의 추가!
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   role: null,
   loading: true,
-  logout: async () => {},
+  logout: async () => {}, // 초기값 추가
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<UserRole>(null);
+  const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
+
+  // ✅ 로그아웃 함수 구현
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      setRole(null); // 로그아웃 시 권한도 초기화
+      setUser(null);
+    } catch (error) {
+      console.error("로그아웃 실패:", error);
+    }
+  };
 
   useEffect(() => {
-    // Firebase 로그인 상태 감지 리스너
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       
       if (currentUser) {
-        // 로그인했다면 DB에서 '권한(role)' 가져오기
         try {
-          const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-          if (userDoc.exists()) {
-            setRole(userDoc.data().role as UserRole);
-          } else {
-            setRole("user"); // DB에 정보 없으면 기본 'user'로 취급
+          // 1️⃣ 관리자(admins) 컬렉션 확인
+          if (currentUser.email) {
+            const adminRef = doc(db, "admins", currentUser.email);
+            const adminSnap = await getDoc(adminRef);
+            
+            if (adminSnap.exists()) {
+              const adminData = adminSnap.data();
+              setRole(adminData.role || "admin"); 
+              setLoading(false);
+              return; 
+            }
           }
+
+          // 2️⃣ 일반 매장(monitored_users) 확인
+          const usersRef = collection(db, "monitored_users");
+          const q = query(usersRef, where("uid", "==", currentUser.uid));
+          const querySnapshot = await getDocs(q);
+
+          if (!querySnapshot.empty) {
+            setRole("user");
+          } else {
+            setRole(null); 
+          }
+
         } catch (error) {
-          console.error("권한 가져오기 실패:", error);
-          setRole("user");
+          console.error("권한 확인 실패:", error);
+          setRole(null);
         }
       } else {
         setRole(null);
@@ -57,11 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  const logout = async () => {
-    await firebaseSignOut(auth);
-    router.push("/"); // 로그아웃 후 메인으로 이동
-  };
-
+  // ✅ value에 logout 추가
   return (
     <AuthContext.Provider value={{ user, role, loading, logout }}>
       {children}
@@ -69,5 +86,4 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// 다른 컴포넌트에서 쉽게 쓰기 위한 커스텀 훅
 export const useAuth = () => useContext(AuthContext);

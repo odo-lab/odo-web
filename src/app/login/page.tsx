@@ -1,116 +1,148 @@
-// src/app/login/page.tsx
 "use client";
 
 import { useState } from "react";
+import { auth, db } from "@/lib/firebase";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import styles from "./page.module.css"; // 스타일 파일이 없다면 일단 제외해도 됩니다.
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const router = useRouter();
+  // 사용자는 'id'만 입력합니다. (이메일 아님)
+  const [formData, setFormData] = useState({ id: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
-  // 로그인 처리 함수
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
     setLoading(true);
+    setError("");
 
     try {
-      // 1. 단순 아이디 입력 시 이메일 형식으로 자동 변환 (편의 기능)
-      let loginEmail = email;
-      if (!email.includes("@")) {
-        loginEmail = `${email}@odo.com`; // 예: admin -> admin@odo.com
-      }
+      // 🕵️‍♂️ [핵심] 아이디 뒤에 가짜 도메인을 붙여서 이메일 형식으로 만듭니다.
+      const fakeEmail = `${formData.id}@odo.com`;
 
-      // 2. Firebase 로그인 요청
-      await signInWithEmailAndPassword(auth, loginEmail, password);
+      // 1. Firebase Auth 로그인 시도
+      await signInWithEmailAndPassword(auth, fakeEmail, formData.password);
       
-      // 3. 성공 시 메인으로 이동 (또는 마이페이지)
-      // AuthContext가 자동으로 상태를 감지하므로 리다이렉트만 하면 됨
-      router.push("/"); 
-      
+      // 2. 로그인 성공 시, 매장 또는 관리자 정보 확인 후 이동
+      checkUserAndRedirect(auth.currentUser!.uid, fakeEmail);
+
     } catch (err: any) {
       console.error("로그인 실패:", err);
-      // 에러 메시지 사용자 친화적으로 변환
-      if (err.code === "auth/invalid-credential" || err.code === "auth/user-not-found") {
-        setError("아이디 또는 비밀번호가 올바르지 않습니다.");
-      } else if (err.code === "auth/too-many-requests") {
-        setError("너무 많은 시도가 있었습니다. 잠시 후 다시 시도해주세요.");
+      // Firebase 에러 코드를 사람이 읽기 좋게 변환
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+        setError("아이디 또는 비밀번호가 일치하지 않습니다.");
       } else {
         setError("로그인 중 오류가 발생했습니다.");
       }
-    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkUserAndRedirect = async (uid: string, email: string) => {
+    try {
+      // A. 일반 매장(User)인지 확인
+      const storesRef = collection(db, "monitored_users");
+      const q = query(storesRef, where("uid", "==", uid));
+      const querySnapshot = await getDocs(q);
+
+      if (!querySnapshot.empty) {
+        console.log("매장 계정 확인됨");
+        router.push("/mypage");
+        return;
+      }
+
+      // B. 관리자(Admin)인지 확인 (매장이 없으면 여기를 체크)
+      // 관리자는 이메일 자체가 문서 ID이므로 바로 조회
+      const adminRef = doc(db, "admins", email);
+      const adminSnap = await getDoc(adminRef);
+
+      if (adminSnap.exists()) {
+        console.log("관리자 계정 확인됨");
+        router.push("/admin/dashboard");
+        return;
+      }
+
+      // C. 둘 다 아니면 (DB에 정보가 없는 깡통 계정)
+      alert("등록된 사용자 정보를 찾을 수 없습니다.");
+      setLoading(false);
+
+    } catch (err) {
+      console.error("DB 조회 실패", err);
       setLoading(false);
     }
   };
 
   return (
-    <section className="card auth-wrap" style={{ maxWidth: 400, margin: "40px auto" }}>
-      <h3 className="section-title" style={{ marginBottom: 20, textAlign: "center" }}>
+    <div style={{ maxWidth: "400px", margin: "100px auto", padding: "30px", background: "#1f2937", borderRadius: "12px", color: "white" }}>
+      <h1 style={{ fontSize: "24px", fontWeight: "bold", marginBottom: "30px", textAlign: "center" }}>
         로그인
-      </h3>
+      </h1>
 
-      <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-        <div className="field">
-          <label style={{ fontWeight: 500, marginBottom: 4, display: "block" }}>아이디 (또는 이메일)</label>
-          <input
-            className="input"
-            type="text"
-            placeholder="admin 또는 user@odo.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+      <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+        
+        {/* 아이디 입력 필드 */}
+        <div>
+            <label style={{display:"block", marginBottom:"6px", fontSize:"14px", color:"#9ca3af"}}>아이디</label>
+            <input 
+            type="text" 
+            placeholder="예: hangyeol-7e" 
+            value={formData.id}
+            onChange={(e) => setFormData({...formData, id: e.target.value})}
             required
-            style={{ width: "100%", padding: "10px", borderRadius: 6, border: "1px solid #ddd" }}
-          />
+            style={inputStyle}
+            />
         </div>
-
-        <div className="field">
-          <label style={{ fontWeight: 500, marginBottom: 4, display: "block" }}>비밀번호</label>
-          <input
-            className="input"
-            type="password"
-            placeholder="비밀번호 입력"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+        
+        {/* 비밀번호 입력 필드 */}
+        <div>
+            <label style={{display:"block", marginBottom:"6px", fontSize:"14px", color:"#9ca3af"}}>비밀번호</label>
+            <input 
+            type="password" 
+            placeholder="비밀번호" 
+            value={formData.password}
+            onChange={(e) => setFormData({...formData, password: e.target.value})}
             required
-            style={{ width: "100%", padding: "10px", borderRadius: 6, border: "1px solid #ddd" }}
-          />
+            style={inputStyle}
+            />
         </div>
+        
+        {error && <div style={{ color: "#ef4444", fontSize: "14px", textAlign: "center", background: "rgba(239, 68, 68, 0.1)", padding: "10px", borderRadius: "6px" }}>{error}</div>}
 
-        {error && (
-          <p style={{ color: "#e74c3c", fontSize: 14, textAlign: "center", margin: 0 }}>
-            {error}
-          </p>
-        )}
-
-        <button
-          className="btn btn-primary"
-          type="submit"
+        <button 
+          type="submit" 
           disabled={loading}
-          style={{
-            marginTop: 10,
-            padding: "12px",
-            backgroundColor: "#3b82f6",
-            color: "white",
-            border: "none",
-            borderRadius: 6,
-            cursor: loading ? "not-allowed" : "pointer",
-            fontWeight: 600
-          }}
+          style={{ ...buttonStyle, background: loading ? "#6b7280" : "#3b82f6" }}
         >
           {loading ? "로그인 중..." : "로그인"}
         </button>
       </form>
-
-      <div style={{ marginTop: 20, textAlign: "center", fontSize: 14, color: "#666" }}>
-        계정이 없으신가요? <Link href="/signup" style={{ color: "#3b82f6", textDecoration: "underline" }}>회원가입</Link>
+      
+      <div style={{ marginTop: "20px", textAlign: "center", fontSize: "14px" }}>
+        <a href="/signup" style={{ color: "#60a5fa", textDecoration: "none" }}>계정이 없으신가요? 회원가입</a>
       </div>
-    </section>
+      <footer style={{
+      position: "fixed",
+      bottom: "20px",
+      width: "100%",
+      textAlign: "center"
+    }}>
+      <a 
+        href="/admin/login" 
+        style={{ color: "#4b5563", fontSize: "12px", textDecoration: "none" }}
+      >
+        Administrator Access
+      </a>
+    </footer>
+    </div>
   );
 }
+
+const inputStyle = {
+  width: "100%", padding: "12px", background: "#374151", border: "1px solid #4b5563", borderRadius: "6px", color: "white", outline: "none", fontSize: "15px"
+};
+
+const buttonStyle = {
+  width: "100%", padding: "12px", border: "none", borderRadius: "6px", color: "white", fontWeight: "bold", fontSize: "15px", cursor: "pointer", transition: "opacity 0.2s"
+};

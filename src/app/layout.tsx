@@ -1,13 +1,11 @@
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
-import SiteHeader from "@/components/SiteHeader";
-import SiteFooter from "@/components/SiteFooter";
-import MainLayout from "@/components/MainLayout"; // 👈 1. 새로 만든 컴포넌트 불러오기
+// 👇 기존 UI 컴포넌트 import는 다 지우고, 이거 하나만 부릅니다.
+import ClientLayout from "@/components/ClientLayout"; 
 
 export const metadata = {
   title: "ODO - 매장용 플레이리스트",
   description: "점주 운영형 플레이리스트 선택 콘솔 (Prototype)",
-  // ... (기존 메타데이터 그대로 유지)
   openGraph: {
     title: "ODO - 매장용 플레이리스트",
     description: "점주 운영형 플레이리스트 선택 콘솔 (Prototype)",
@@ -35,14 +33,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="ko">
       <body>
         <AuthProvider>
-          <SiteHeader />
-          
-          {/* 👇 2. 기존 <main className="container main"> 삭제하고 이걸로 교체! */}
-          <MainLayout>
+          {/* 👇 여기서 ClientLayout이 "관리자냐 아니냐"를 판단해서 화면을 그려줍니다 */}
+          <ClientLayout>
             {children}
-          </MainLayout>
-          
-          <SiteFooter />
+          </ClientLayout>
         </AuthProvider>
       </body>
     </html>
