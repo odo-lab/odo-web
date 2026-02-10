@@ -2,34 +2,46 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { auth, db } from "./firebase";
-import { onAuthStateChanged, User, signOut } from "firebase/auth"; // signOut 추가됨
+import { onAuthStateChanged, User, signOut } from "firebase/auth";
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { useRouter } from "next/navigation"; // 👈 페이지 이동을 위해 추가
+import Cookies from "js-cookie"; // 👈 쿠키 삭제를 위해 추가
 
 interface AuthContextType {
   user: User | null;
   role: string | null;
   loading: boolean;
-  logout: () => Promise<void>; // ✅ 여기에 logout 함수 타입 정의 추가!
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   role: null,
   loading: true,
-  logout: async () => {}, // 초기값 추가
+  logout: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const router = useRouter(); // 👈 라우터 훅 사용
 
-  // ✅ 로그아웃 함수 구현
+  // ✅ [수정됨] 완벽한 로그아웃 함수
   const logout = async () => {
     try {
+      // 1. 파이어베이스 로그아웃
       await signOut(auth);
-      setRole(null); // 로그아웃 시 권한도 초기화
+      
+      // 2. 브라우저 쿠키(입장권) 파기 (이게 핵심!)
+      Cookies.remove("admin_logged_in");
+
+      // 3. 상태 초기화
+      setRole(null);
       setUser(null);
+
+      // 4. 로그인 페이지로 강제 이동
+      router.replace("/admin/login"); 
     } catch (error) {
       console.error("로그아웃 실패:", error);
     }
@@ -48,16 +60,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             
             if (adminSnap.exists()) {
               const adminData = adminSnap.data();
-              setRole(adminData.role || "admin"); 
+              setRole(adminData.role || "admin");
+              
+              // 🍪 [추가됨] 관리자 확인 시 쿠키 발급 (미들웨어 통과용)
+              Cookies.set("admin_logged_in", "true", { expires: 1 });
+              
               setLoading(false);
               return; 
             }
           }
 
           // 2️⃣ 일반 매장(monitored_users) 확인
+          // (일반 유저는 admin 쿠키를 굳이 구울 필요 없거나, 별도 처리)
           const usersRef = collection(db, "monitored_users");
           const q = query(usersRef, where("uid", "==", currentUser.uid));
-          const querySnapshot = await getDocs(q);
+          const querySnapshot = await getDocs(q); // getDocs 사용 (where 쿼리니까)
 
           if (!querySnapshot.empty) {
             setRole("user");
@@ -70,7 +87,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setRole(null);
         }
       } else {
+        // 유저가 없을 때 (로그아웃 상태 등)
         setRole(null);
+        Cookies.remove("admin_logged_in"); // 확실하게 쿠키 제거
       }
       setLoading(false);
     });
@@ -78,7 +97,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  // ✅ value에 logout 추가
   return (
     <AuthContext.Provider value={{ user, role, loading, logout }}>
       {children}

@@ -25,7 +25,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // 👇 로그인 페이지가 아닐 때만 아래 사이드바 레이아웃을 렌더링합니다.
   const menuItems = [
     { name: "매장 통계", href: "/admin/dashboard", icon: "📊" },
-    { name: "곡별 통계", href: "/admin/songs", icon: "🎵" },
+    { name: "데이터 검증", href: "/admin/validator", icon: "🚨" },
     { name: "프랜차이즈 통계", href: "/admin/franchise", icon: "🏪" },
     { name: "환경설정", href: "/admin/settings", icon: "⚙️" },
   ];
