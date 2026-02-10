@@ -26,7 +26,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const menuItems = [
     { name: "매장 통계", href: "/admin/dashboard", icon: "📊" },
     { name: "곡별 통계", href: "/admin/songs", icon: "🎵" },
-    { name: "미청취 매장", href: "/admin/inactive", icon: "⚠️" },
+    { name: "프랜차이즈 통계", href: "/admin/franchise", icon: "🏪" },
     { name: "환경설정", href: "/admin/settings", icon: "⚙️" },
   ];
 

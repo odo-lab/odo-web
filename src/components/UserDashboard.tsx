@@ -3,23 +3,30 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { db } from "@/lib/firebase";
-// 👇 getDoc 추가!
 import { collection, query, where, getDocs, writeBatch, doc, Timestamp, getDoc } from "firebase/firestore";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface UserDashboardProps {
-  targetId: string; // monitored_users의 문서 ID (또는 점주의 경우 UID)
+  targetId: string; // monitored_users의 문서 ID (또는 UID)
   isAdmin?: boolean; 
 }
 
 export default function UserDashboard({ targetId, isAdmin = false }: UserDashboardProps) {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // 데이터 로딩
+  const [syncing, setSyncing] = useState(false); // 동기화 중
   const [storeInfo, setStoreInfo] = useState<any>(null);
   
-  const [stats, setStats] = useState({ thisMonth: 0, lastMonth: 0, total: 0 });
+  // 통계 상태 (이번달, 정산금, 달성률 등)
+  const [stats, setStats] = useState({ 
+    playCount: 0, 
+    revenue: 0, 
+    achievementRate: 0 
+  });
+  
   const [chartData, setChartData] = useState<any[]>([]);
 
+  // 📅 날짜 포맷팅
   const formatYMD = (date: Date) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -27,25 +34,45 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
     return `${year}-${month}-${day}`;
   };
 
+  // 🗓️ 기본 조회 기간: 이번 달 1일 ~ 어제
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+
+  const [dateRange, setDateRange] = useState({
+    start: formatYMD(new Date(today.getFullYear(), today.getMonth(), 1)), 
+    end: formatYMD(yesterday)
+  });
+
+  // 💰 정산금 계산 로직 (관리자 페이지와 동일)
+  const calculateRevenue = (franchise: string, plays: number) => {
+    let maxRevenue = 30000; // 개인/기타
+    if (franchise === 'seveneleven') {
+        maxRevenue = 22000;
+    }
+
+    if (plays < 2500) return 0;
+    else if (plays < 5000) return Math.floor(maxRevenue / 3);
+    else if (plays < 7500) return Math.floor((maxRevenue * 2) / 3);
+    else return maxRevenue;
+  };
+
+  // 초기 로딩: 매장 정보 가져오기 -> 데이터 조회
   useEffect(() => {
     async function initData() {
       if (!targetId) return;
+      setLoading(true);
       try {
         let storeData = null;
         let realLastfmId = "";
 
-        // 1. 🎯 [수정됨] targetId가 "문서 ID"라고 하셨으므로, 바로 조회합니다.
-        // 예: doc(db, "monitored_users", "dae-gao")
         const docRef = doc(db, "monitored_users", targetId);
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-          // A. 문서 ID로 바로 찾은 경우
           storeData = docSnap.data();
           realLastfmId = storeData.lastfm_username;
         } else {
-          // B. 만약 문서 ID로 못 찾았다면? (혹시 점주 로그인이라 UID가 넘어왔을 경우 대비)
-          // 기존처럼 필드 검색으로 한 번 더 찾아주는 '안전장치'를 둡니다.
           const storesRef = collection(db, "monitored_users");
           const q = query(storesRef, where("uid", "==", targetId));
           const querySnapshot = await getDocs(q);
@@ -59,10 +86,8 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
 
         if (storeData && realLastfmId) {
           setStoreInfo({ ...storeData, id: realLastfmId });
-          // 데이터 조회 시작
-          await fetchDashboardData(realLastfmId);
+          await fetchDashboardData(realLastfmId, dateRange.start, dateRange.end, storeData.franchise);
         } else {
-          console.error("매장 정보를 찾을 수 없습니다:", targetId);
           setStoreInfo(null);
         }
       } catch (error) {
@@ -73,9 +98,6 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
     }
     initData();
   }, [targetId]);
-
-  // ... (나머지 getDatesInRange, fetchDashboardData, render 부분은 기존과 동일) ...
-  // ... (아래 코드는 기존 코드를 그대로 유지하세요) ...
 
   const getDatesInRange = (startDate: Date, endDate: Date) => {
     const dates = [];
@@ -93,113 +115,154 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
     return dates;
   };
 
-  const fetchDashboardData = async (lastfmId: string) => {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const yesterday = new Date(now);
-    yesterday.setDate(now.getDate() - 1);
-    
-    const startDateStr = formatYMD(startOfMonth);
-    const endDateStr = formatYMD(yesterday);
-
-    const statsColl = collection(db, "daily_stats");
-    const qStats = query(
-      statsColl, 
-      where("date", ">=", startDateStr),
-      where("date", "<=", endDateStr)
-    );
-    const statsSnap = await getDocs(qStats);
-    
-    const myStats: any[] = [];
-    statsSnap.forEach(doc => {
-        const d = doc.data();
-        if (d.lastfm_username === lastfmId || d.userId === lastfmId) {
-            myStats.push(d);
-        }
-    });
-
-    const existingDates = new Set(myStats.map(s => s.date));
-    const requiredDates = getDatesInRange(startOfMonth, yesterday);
-    const missingDates = requiredDates.filter(d => !existingDates.has(d));
-
-    if (missingDates.length > 0) {
-        console.log(`⚡ [${lastfmId}] 누락된 ${missingDates.length}일치 데이터 복구 시작`);
-        missingDates.sort();
-        const minDate = new Date(missingDates[0]); minDate.setHours(0,0,0,0);
-        const maxDate = new Date(missingDates[missingDates.length-1]); maxDate.setHours(23,59,59,999);
-        
-        const historyRef = collection(db, "listening_history");
-        const qHistory = query(
-            historyRef, 
-            where("timestamp", ">=", minDate), 
-            where("timestamp", "<=", maxDate)
+  // 🚀 데이터 조회 함수
+  const fetchDashboardData = async (lastfmId: string, startStr: string, endStr: string, franchise: string) => {
+    setLoading(true);
+    try {
+        const statsColl = collection(db, "daily_stats");
+        const qStats = query(
+            statsColl, 
+            where("date", ">=", startStr),
+            where("date", "<=", endStr)
         );
-        const historySnap = await getDocs(qHistory);
+        const statsSnap = await getDocs(qStats);
         
-        const tempMap: Record<string, any> = {};
-        historySnap.forEach(doc => {
+        const myStats: any[] = [];
+        statsSnap.forEach(doc => {
             const d = doc.data();
-            const uid = d.userId || d.user_id;
-            if (uid !== lastfmId) return; 
-
-            const utcDate = d.timestamp instanceof Timestamp ? d.timestamp.toDate() : new Date(d.timestamp);
-            const kstDate = new Date(utcDate.getTime() + (9 * 60 * 60 * 1000));
-            const dateStr = kstDate.toISOString().split('T')[0];
-            
-            if (missingDates.includes(dateStr)) {
-                if (!tempMap[dateStr]) {
-                    tempMap[dateStr] = {
-                        date: dateStr,
-                        lastfm_username: lastfmId,
-                        play_count: 0,
-                        store_name: storeInfo?.store_name || "Unknown",
-                        franchise: storeInfo?.franchise || "personal"
-                    };
-                }
-                tempMap[dateStr].play_count++;
+            if (d.lastfm_username === lastfmId || d.userId === lastfmId) {
+                myStats.push(d);
             }
         });
+
+        const requiredDates = getDatesInRange(new Date(startStr), new Date(endStr));
+        let totalCount = 0;
+        const chartMap: Record<string, number> = {};
+        requiredDates.forEach(d => chartMap[d] = 0);
         
-        const recovered = Object.values(tempMap);
-        if (recovered.length > 0) {
-            const batch = writeBatch(db);
-            recovered.forEach(stat => {
-                myStats.push(stat);
-                const ref = doc(db, "daily_stats", `${stat.date}_${lastfmId}`);
-                batch.set(ref, stat, { merge: true });
-            });
-            await batch.commit();
-        }
+        myStats.forEach(stat => {
+            const count = stat.play_count !== undefined ? stat.play_count : (stat.playCount || 0);
+            chartMap[stat.date] = count;
+            totalCount += count;
+        });
+
+        const finalChartData = requiredDates.map(date => ({
+            name: date.slice(5),
+            plays: chartMap[date]
+        }));
+
+        // 정산금 및 달성률 계산
+        const estimatedRevenue = calculateRevenue(franchise || 'personal', totalCount);
+        const achievementRate = Math.min((totalCount / 7500) * 100, 100);
+
+        setStats({
+            playCount: totalCount,
+            revenue: estimatedRevenue,
+            achievementRate: achievementRate
+        });
+        setChartData(finalChartData);
+
+    } catch (e) {
+        console.error(e);
+    } finally {
+        setLoading(false);
     }
-
-    let thisMonthCount = 0;
-    const chartMap: Record<string, number> = {};
-    requiredDates.forEach(d => chartMap[d] = 0);
-    
-    myStats.forEach(stat => {
-        const count = stat.play_count !== undefined ? stat.play_count : (stat.playCount || 0);
-        chartMap[stat.date] = count;
-        thisMonthCount += count;
-    });
-
-    const finalChartData = requiredDates.map(date => ({
-        name: date.slice(5),
-        plays: chartMap[date]
-    }));
-
-    setStats({
-        thisMonth: thisMonthCount,
-        lastMonth: 0, 
-        total: 0      
-    });
-    setChartData(finalChartData);
   };
 
-  if (loading) return <div style={{ padding: 40, textAlign: "center", color: "#888" }}>데이터 분석 중...</div>;
-  if (!storeInfo) return <div style={{ padding: 40, textAlign: "center", color: "white" }}>매장 정보를 찾을 수 없습니다.</div>;
+  // 🛠️ 데이터 동기화 함수
+  const syncData = async () => {
+      if (!storeInfo) return;
+      const lastfmId = storeInfo.id;
+      
+      if (!confirm(`${dateRange.start} ~ ${dateRange.end} 기간의 데이터를 재산출 하시겠습니까?`)) return;
+
+      setSyncing(true);
+      try {
+          const artistsSnap = await getDocs(collection(db, "monitored_artists"));
+          const allowedArtists = new Set<string>();
+          artistsSnap.forEach(doc => allowedArtists.add(doc.id.trim().toLowerCase()));
+
+          const start = new Date(dateRange.start); start.setHours(0,0,0,0);
+          const end = new Date(dateRange.end); end.setHours(23,59,59,999);
+          
+          const historyRef = collection(db, "listening_history");
+          const qHistory = query(historyRef, where("timestamp", ">=", start), where("timestamp", "<=", end));
+          const historySnap = await getDocs(qHistory);
+          
+          const uniqueRecords = new Map();
+          historySnap.forEach(doc => {
+              const d = doc.data();
+              const uid = d.userId || d.user_id;
+              if (uid !== lastfmId) return; 
+
+              const utcDate = d.timestamp instanceof Timestamp ? d.timestamp.toDate() : new Date(d.timestamp);
+              const dedupKey = `${uid}|${utcDate.getTime()}`;
+              
+              if (!uniqueRecords.has(dedupKey)) {
+                  uniqueRecords.set(dedupKey, { ...d, timestamp: utcDate });
+              }
+          });
+
+          const userDailyStats: Record<string, Record<string, number>> = {};
+          const KST_OFFSET = 9 * 60 * 60 * 1000;
+
+          uniqueRecords.forEach((record) => {
+              if (!record.artist) return;
+              const normalizedArtist = record.artist.trim().toLowerCase();
+              if (!allowedArtists.has(normalizedArtist)) return;
+
+              const kstDate = new Date(record.timestamp.getTime() + KST_OFFSET);
+              const dateStr = kstDate.toISOString().split('T')[0];
+
+              if (!userDailyStats[dateStr]) userDailyStats[dateStr] = {};
+              const trackKey = `${record.track}|${normalizedArtist}`;
+              userDailyStats[dateStr][trackKey] = (userDailyStats[dateStr][trackKey] || 0) + 1;
+          });
+
+          const DAILY_MAX_COUNT = 10;
+          const finalStats: any[] = [];
+
+          Object.entries(userDailyStats).forEach(([date, trackCounts]) => {
+              let validPlays = 0;
+              Object.values(trackCounts).forEach(count => {
+                  validPlays += Math.min(count, DAILY_MAX_COUNT);
+              });
+
+              finalStats.push({
+                  date: date,
+                  lastfm_username: lastfmId,
+                  play_count: validPlays,
+                  store_name: storeInfo.store_name,
+                  franchise: storeInfo.franchise
+              });
+          });
+
+          if (finalStats.length > 0) {
+              const batch = writeBatch(db);
+              finalStats.forEach(stat => {
+                  const ref = doc(db, "daily_stats", `${stat.date}_${lastfmId}`);
+                  batch.set(ref, stat, { merge: true });
+              });
+              await batch.commit();
+              alert("동기화 완료! 통계가 재산출되었습니다.");
+              fetchDashboardData(lastfmId, dateRange.start, dateRange.end, storeInfo.franchise);
+          } else {
+              alert("해당 기간에 유효한 재생 기록이 없습니다.");
+          }
+
+      } catch (e) {
+          console.error(e);
+          alert("오류 발생");
+      } finally {
+          setSyncing(false);
+      }
+  };
+
+  if (!storeInfo) return <div style={{ padding: 40, textAlign: "center", color: "white" }}>{loading ? "로딩 중..." : "매장 정보를 찾을 수 없습니다."}</div>;
 
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto", padding: "20px" }}>
+      {/* 뒤로가기 (관리자용) */}
       {isAdmin && (
         <button 
           onClick={() => router.back()}
@@ -209,6 +272,7 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
         </button>
       )}
 
+      {/* 헤더 */}
       <header style={{ marginBottom: "30px", borderBottom: "1px solid #333", paddingBottom: "20px" }}>
         <h2 style={{ fontSize: "24px", fontWeight: "bold", color: "white", marginBottom: "8px" }}>
           {isAdmin ? `📂 ${storeInfo.store_name} 상세 통계` : `👋 안녕하세요, ${storeInfo.store_name} 점주님!`}
@@ -218,15 +282,92 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
         </div>
       </header>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "20px", marginBottom: "40px" }}>
-        <StatCard title="이번 달 재생 수" count={stats.thisMonth} color="#3b82f6" subText={`1일 ~ 어제까지 합계`} />
-        <StatCard title="지난 달 재생 수" count={stats.lastMonth} color="#9ca3af" subText="준비 중" />
-        <StatCard title="총 누적 재생 수" count={stats.total} color="#10b981" subText="준비 중" />
+      {/* 날짜 컨트롤 & 동기화 */}
+      <div style={filterContainerStyle}>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+          <span style={{ color: "#ccc", fontSize: "14px", fontWeight: "bold" }}>기간 조회</span>
+          <input type="date" value={dateRange.start} onChange={(e)=>setDateRange({...dateRange, start:e.target.value})} style={inputStyle} />
+          <span style={{ color: "#888" }}>~</span>
+          <input type="date" value={dateRange.end} onChange={(e)=>setDateRange({...dateRange, end:e.target.value})} style={inputStyle} />
+          <button onClick={() => fetchDashboardData(storeInfo.id, dateRange.start, dateRange.end, storeInfo.franchise)} style={primaryBtnStyle}>조회</button>
+        </div>
+       
       </div>
 
+      {/* 📊 [1] 달성률 섹션 (프로그래스 바) */}
+      <div style={{ background: "#222", padding: "25px", borderRadius: "16px", border: "1px solid #333", marginBottom: "20px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
+            <div>
+                <h3 style={{ color: "white", fontSize: "18px", fontWeight: "bold", marginBottom: "4px" }}>
+                    이번 달 목표 달성률 <span style={{color:"#3b82f6"}}>{stats.achievementRate.toFixed(1)}%</span>
+                </h3>
+                <div style={{ color: "#888", fontSize: "13px" }}>목표 7,500곡 / 현재 {stats.playCount.toLocaleString()}곡</div>
+            </div>
+            
+            {/* Last.fm 바로가기 버튼 */}
+            <a 
+                href={`https://www.last.fm/user/${storeInfo.id}`} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                style={{
+                    background: "#333", color: "#ccc", padding: "8px 16px", borderRadius: "8px", 
+                    textDecoration: "none", fontSize: "13px", border: "1px solid #444", display: "flex", alignItems: "center", gap: "6px"
+                }}
+            >
+                🎵 Last.fm 상세
+            </a>
+        </div>
+
+        {/* 커스텀 프로그래스 바 */}
+        <div style={{ position: "relative", height: "24px", background: "#444", borderRadius: "12px", overflow: "hidden" }}>
+            {/* 진행 막대 */}
+            <div style={{ 
+                width: `${stats.achievementRate}%`, 
+                height: "100%", 
+                background: "linear-gradient(90deg, #3b82f6 0%, #10b981 100%)",
+                transition: "width 0.5s ease-in-out"
+            }} />
+            
+            {/* 1/3 지점 (2500곡) */}
+            <div style={{ position: "absolute", left: "33.3%", top: 0, bottom: 0, borderLeft: "2px dashed rgba(255,255,255,0.3)" }} />
+            <div style={{ position: "absolute", left: "34%", top: "4px", fontSize: "10px", color: "rgba(255,255,255,0.5)" }}>2500</div>
+
+            {/* 2/3 지점 (5000곡) */}
+            <div style={{ position: "absolute", left: "66.6%", top: 0, bottom: 0, borderLeft: "2px dashed rgba(255,255,255,0.3)" }} />
+            <div style={{ position: "absolute", left: "67%", top: "4px", fontSize: "10px", color: "rgba(255,255,255,0.5)" }}>5000</div>
+        </div>
+      </div>
+
+      {/* 💳 [2] 통계 카드 그리드 */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "20px", marginBottom: "30px" }}>
+        {/* 재생수 */}
+        <StatCard 
+            title="이번 달 재생 수" 
+            count={`${stats.playCount.toLocaleString()} 곡`} 
+            color="#3b82f6" 
+            subText={`${dateRange.start} ~ ${dateRange.end}`} 
+        />
+        {/* 정산금 (강조) */}
+        <StatCard 
+            title="예상 정산금" 
+            count={`${stats.revenue.toLocaleString()} 원`} 
+            color="#10b981" 
+            subText="구간별 차등 지급 적용됨" 
+            isHighlight={true}
+        />
+        {/* 지난달 (현재는 0 처리) */}
+        <StatCard 
+            title="지난 달 리포트" 
+            count="준비 중" 
+            color="#9ca3af" 
+            subText="다음 업데이트 예정" 
+        />
+      </div>
+
+      {/* 📈 [3] 차트 섹션 */}
       <div style={{ background: "#222", padding: "30px", borderRadius: "16px", border: "1px solid #333" }}>
         <h3 style={{ fontSize: "18px", fontWeight: "bold", color: "white", marginBottom: "20px" }}>
-          📈 이번 달 일별 재생 추이 (어제 마감)
+          📈 일별 재생 추이
         </h3>
         <div style={{ height: "300px", width: "100%" }}>
           <ResponsiveContainer width="100%" height="100%">
@@ -244,14 +385,22 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
   );
 }
 
-function StatCard({ title, count, color, subText }: any) {
+function StatCard({ title, count, color, subText, isHighlight = false }: any) {
   return (
-    <div style={{ background: "#222", padding: "24px", borderRadius: "12px", borderTop: `4px solid ${color}` }}>
+    <div style={{ 
+        background: "#222", padding: "24px", borderRadius: "12px", 
+        borderTop: `4px solid ${color}`,
+        boxShadow: isHighlight ? "0 4px 20px rgba(16, 185, 129, 0.1)" : "none"
+    }}>
       <h4 style={{ color: "#aaa", fontSize: "14px", marginBottom: "8px" }}>{title}</h4>
-      <div style={{ fontSize: "32px", fontWeight: "bold", color: "white", marginBottom: "4px" }}>
-        {count.toLocaleString()} <span style={{ fontSize: "16px", fontWeight: "normal" }}>곡</span>
+      <div style={{ fontSize: "28px", fontWeight: "bold", color: isHighlight ? "#10b981" : "white", marginBottom: "4px" }}>
+        {count}
       </div>
       <div style={{ fontSize: "12px", color: "#666" }}>{subText}</div>
     </div>
   );
 }
+
+const filterContainerStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", background: "#222", padding: "15px 20px", borderRadius: "12px", border: "1px solid #333" };
+const inputStyle = { border: "1px solid #444", background: "#333", color: "white", borderRadius: "6px", padding: "8px 10px", fontSize: "14px", outline: "none" };
+const primaryBtnStyle = { background: "#3b82f6", color: "white", border: "none", padding: "8px 16px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" };
