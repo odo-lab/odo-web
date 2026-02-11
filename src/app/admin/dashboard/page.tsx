@@ -395,7 +395,9 @@ const calculateRevenue = (franchise: string, plays: number) => {
   };
 
   return (
+    
     <div style={{ padding: "40px", maxWidth: "1200px", margin: "0 auto", paddingBottom: "100px" }}>
+      
       {/* 상단 필터 & 동기화 버튼 */}
       <div style={filterContainerStyle}>
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>

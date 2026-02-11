@@ -4,10 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { logout } = useAuth();
+  const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // 🕵️‍♂️ [추가된 로직] 현재 페이지가 로그인 페이지인지 확인
@@ -34,8 +36,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div className="admin-container">
       {/* ⬛️ 사이드바 */}
       <aside className="admin-sidebar">
+        
         <div className="sidebar-header">
-          <h1 className="logo-text">ODO Admin</h1>
+          {/* 🏠 [수정됨] 클릭 시 새로고침하며 홈으로 이동 */}
+          <h1 
+            className="logo-text"
+            onClick={() => router.push('/admin/dashboard')}
+            style={{ cursor: 'pointer' }}
+          >
+            ODO Admin
+          </h1>
           <button 
             className="mobile-toggle"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
