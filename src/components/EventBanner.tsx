@@ -117,17 +117,8 @@ export default function EventBanner({
               ➡
             </button>
 
-            <div className="ebDots" role="tablist" aria-label="배너 선택">
-              {safeItems.map((b, i) => (
-                <button
-                  key={b.id}
-                  type="button"
-                  className={`ebDot ${i === idx ? "isActive" : ""}`}
-                  onClick={() => setIdx(i)}
-                  aria-label={`${i + 1}번 배너`}
-                  aria-current={i === idx}
-                />
-              ))}
+            <div className="ebCounter" aria-label="배너 순서">
+              {String(idx + 1).padStart(2, "0")} / {String(count).padStart(2, "0")}
             </div>
 
             {/* progress bar (autoplay 시각화) */}
