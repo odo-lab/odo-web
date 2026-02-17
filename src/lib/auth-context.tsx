@@ -26,26 +26,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter(); // 👈 라우터 훅 사용
+  
+const logout = async () => {
+  try {
+    // 이동할 타겟 경로를 미리 결정 (현재 역할에 따라)
+    // 만약 관리자였다면 관리자 로그인으로, 아니면 일반 로그인으로 보냅니다.
+    const targetPath = role === "admin" ? "/admin/login" : "/login";
 
-  // ✅ [수정됨] 완벽한 로그아웃 함수
-  const logout = async () => {
-    try {
-      // 1. 파이어베이스 로그아웃
-      await signOut(auth);
-      
-      // 2. 브라우저 쿠키(입장권) 파기 (이게 핵심!)
-      Cookies.remove("admin_logged_in");
+    // 1. 파이어베이스 로그아웃
+    await signOut(auth);
+    
+    // 2. 관리자 쿠키 삭제
+    Cookies.remove("admin_logged_in");
 
-      // 3. 상태 초기화
-      setRole(null);
-      setUser(null);
+    // 3. 상태 초기화
+    setRole(null);
+    setUser(null);
 
-      // 4. 로그인 페이지로 강제 이동
-      router.replace("/admin/login"); 
-    } catch (error) {
-      console.error("로그아웃 실패:", error);
-    }
-  };
+    // 4. 결정된 경로로 이동
+    router.replace(targetPath); 
+    
+  } catch (error) {
+    console.error("로그아웃 실패:", error);
+  }
+};
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {

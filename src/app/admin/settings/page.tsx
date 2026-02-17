@@ -5,31 +5,31 @@ import { db } from "@/lib/firebase";
 import { collection, getDocs, doc, setDoc, deleteDoc, getCountFromServer } from "firebase/firestore";
 
 export default function AdminSettingsPage() {
-  const [activeTab, setActiveTab] = useState("artist"); // 기본 탭: 아티스트 관리
+  const [activeTab, setActiveTab] = useState("playlist"); // 기본 탭: 플레이리스트 관리
 
   return (
     <div style={{ padding: "40px", maxWidth: "1000px", margin: "0 auto" }}>
-      <h2 style={{ fontSize: "24px", fontWeight: "bold", marginBottom: "30px" }}>⚙️ 환경 설정</h2>
+      <h2 style={{ color: "#444",fontSize: "24px", fontWeight: "bold", marginBottom: "30px" }}>⚙️ 환경 설정</h2>
 
       {/* 탭 메뉴 */}
       <div style={{ display: "flex", gap: "10px", marginBottom: "30px", borderBottom: "1px solid #ddd", paddingBottom: "10px" }}>
-        <TabButton label="🎵 아티스트 관리" isActive={activeTab === "artist"} onClick={() => setActiveTab("artist")} />
+        <TabButton label="🧑‍🎤🧑‍🎤 아티스트 관리" isActive={activeTab === "artist"} onClick={() => setActiveTab("artist")} />
         <TabButton label="💰 정산 기준 관리" isActive={activeTab === "settlement"} onClick={() => setActiveTab("settlement")} />
-        <TabButton label="🏪 매장 관리" isActive={activeTab === "store"} onClick={() => setActiveTab("store")} />
+        <TabButton label="🎵 플레이리스트" isActive={activeTab === "playlist"} onClick={() => setActiveTab("playlist")} />
       </div>
 
       {/* 탭 내용 영역 */}
       <div style={{ background: "white", padding: "30px", borderRadius: "12px", border: "1px solid #eee", boxShadow: "0 2px 8px rgba(0,0,0,0.05)" }}>
         {activeTab === "artist" && <ArtistManager />}
         {activeTab === "settlement" && <SettlementManager />}
-        {activeTab === "store" && <StoreManager />}
+        {activeTab === "playlist" && <PlaylistManager />}
       </div>
     </div>
   );
 }
 
 // ----------------------------------------------------------------------
-// 1. 🎵 아티스트 관리 컴포넌트 (핵심 기능)
+// 1. 🎵 아티스트 관리 컴포넌트
 // ----------------------------------------------------------------------
 function ArtistManager() {
   const [artists, setArtists] = useState<{ name: string, createdAt: string }[]>([]);
@@ -40,199 +40,235 @@ function ArtistManager() {
     fetchArtists();
   }, []);
 
-  // 목록 불러오기
   const fetchArtists = async () => {
     setLoading(true);
     try {
       const snap = await getDocs(collection(db, "monitored_artists"));
       const list: { name: string, createdAt: string }[] = [];
-      
       snap.forEach(doc => {
         const data = doc.data();
         list.push({
-            name: doc.id, // 문서 ID가 곧 아티스트 이름
-            createdAt: data.createdAt ? new Date(data.createdAt).toLocaleDateString() : "-"
+          name: doc.id,
+          createdAt: data.createdAt ? new Date(data.createdAt).toLocaleDateString() : "-"
         });
       });
-      
-      // 가나다순 정렬
       list.sort((a, b) => a.name.localeCompare(b.name));
       setArtists(list);
     } catch (e) {
       console.error(e);
-      alert("목록을 불러오는데 실패했습니다.");
+      alert("목록 불러오기 실패");
     } finally {
       setLoading(false);
     }
   };
 
-  // 아티스트 추가
   const handleAdd = async () => {
     const name = newArtist.trim();
-    if (!name) return alert("아티스트 이름을 입력해주세요.");
-    
-    // 중복 체크 (대소문자 무시)
-    if (artists.some(a => a.name.toLowerCase() === name.toLowerCase())) {
-        return alert("이미 등록된 아티스트입니다.");
-    }
-
-    if (!confirm(`'${name}'을(를) 정산 대상 아티스트로 추가하시겠습니까?`)) return;
+    if (!name) return alert("이름을 입력하세요.");
+    if (artists.some(a => a.name.toLowerCase() === name.toLowerCase())) return alert("이미 존재합니다.");
+    if (!confirm(`'${name}'을(를) 추가하시겠습니까?`)) return;
 
     try {
-      await setDoc(doc(db, "monitored_artists", name), {
-        createdAt: new Date().toISOString(),
-        active: true
-      });
-      alert("추가되었습니다!");
+      await setDoc(doc(db, "monitored_artists", name), { createdAt: new Date().toISOString(), active: true });
       setNewArtist(""); 
       fetchArtists();   
-    } catch (e) {
-      console.error(e);
-      alert("추가 중 오류가 발생했습니다.");
-    }
+    } catch (e) { console.error(e); }
   };
 
-  // 아티스트 삭제
   const handleDelete = async (name: string) => {
-    if (!confirm(`⚠️ 정말 삭제하시겠습니까?\n\n아티스트: ${name}\n\n삭제 후에는 해당 아티스트의 재생 로그가 정산 카운트에서 제외됩니다.`)) return;
-
+    if (!confirm(`정말 삭제하시겠습니까?`)) return;
     try {
       await deleteDoc(doc(db, "monitored_artists", name));
-      alert("삭제되었습니다.");
       fetchArtists();
-    } catch (e) {
-      console.error(e);
-      alert("삭제 중 오류가 발생했습니다.");
-    }
-  };
-
-  // 📊 DB 실제 개수 확인 (전수 조사)
-  const checkTotalCount = async () => {
-    try {
-      const coll = collection(db, "monitored_artists");
-      const snapshot = await getCountFromServer(coll);
-      alert(`📊 현재 DB에 저장된 총 아티스트 수는 [ ${snapshot.data().count.toLocaleString()}명 ] 입니다.`);
-    } catch (e) {
-      console.error(e);
-      alert("오류가 발생했습니다.");
-    }
+    } catch (e) { console.error(e); }
   };
 
   return (
     <div>
-      {/* 헤더 섹션 */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "20px" }}>
-        <div>
-            <h3 style={{ fontSize: "18px", fontWeight: "bold", marginBottom: "8px" }}>정산 대상 아티스트 목록</h3>
-            <p style={{ color: "#666", fontSize: "14px" }}>
-                등록된 아티스트의 곡만 유효 재생으로 인정됩니다.
-            </p>
-        </div>
-        <div style={{ textAlign: "right" }}>
-            {/* DB 전수 조사 버튼 */}
-            <button 
-                onClick={checkTotalCount}
-                style={{
-                    background: "#fff", border: "1px solid #ddd", padding: "6px 12px", 
-                    borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "bold",
-                    color: "#555", marginRight: "10px"
-                }}
-            >
-                📊 DB 전수 조사
-            </button>
-            <span style={{ fontSize: "13px", color: "#888" }}>
-                화면 목록: <span style={{ fontWeight: "bold", color: "#333" }}>{artists.length}</span>팀
-            </span>
-        </div>
+      <div style={{ color: "#444",display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "20px" }}>
+        <h3>정산 대상 아티스트</h3>
+        <span>화면 목록: {artists.length}팀</span>
       </div>
-
-      {/* 입력폼 */}
-      <div style={{ display: "flex", gap: "10px", marginBottom: "30px", padding: "20px", background: "#f9fafb", borderRadius: "8px" }}>
-        <input 
-          type="text" 
-          placeholder="추가할 아티스트 이름 (예: NewJeans)" 
-          value={newArtist}
-          onChange={(e) => setNewArtist(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-          style={inputStyle}
-        />
+      <div style={{ color: "#444",display: "flex", gap: "10px", marginBottom: "30px", padding: "20px", background: "#f9fafb", borderRadius: "8px" }}>
+        <input type="text" placeholder="아티스트 이름" value={newArtist} onChange={(e) => setNewArtist(e.target.value)} style={inputStyle} />
         <button onClick={handleAdd} style={primaryBtnStyle}>+ 추가</button>
       </div>
-
-      {/* 목록 테이블 */}
-      {loading ? (
-        <div style={{ textAlign: "center", padding: "40px", color: "#888" }}>⏳ 목록을 불러오는 중...</div>
-      ) : (
-        <div style={{ border: "1px solid #eee", borderRadius: "8px", overflow: "hidden" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
-                <thead>
-                    <tr style={{ background: "#f3f4f6", borderBottom: "1px solid #e5e7eb", color: "#4b5563" }}>
-                        <th style={{ padding: "12px 20px", textAlign: "left" }}>NO</th>
-                        <th style={{ padding: "12px 20px", textAlign: "left" }}>아티스트명</th>
-                        <th style={{ padding: "12px 20px", textAlign: "center" }}>등록일</th>
-                        <th style={{ padding: "12px 20px", textAlign: "center" }}>관리</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {artists.length > 0 ? (
-                        artists.map((artist, idx) => (
-                            // 🚨 Key 에러 방지: 이름과 인덱스를 조합하여 고유 Key 생성
-                            <tr key={`${artist.name}-${idx}`} style={{ borderBottom: "1px solid #f9fafb", transition: "background 0.2s" }}>
-                                <td style={{ padding: "12px 20px", color: "#9ca3af", width: "60px" }}>{idx + 1}</td>
-                                <td style={{ padding: "12px 20px", fontWeight: "600", color: "#1f2937" }}>
-                                    {artist.name}
-                                </td>
-                                <td style={{ padding: "12px 20px", textAlign: "center", color: "#6b7280" }}>
-                                    {artist.createdAt}
-                                </td>
-                                <td style={{ padding: "12px 20px", textAlign: "center" }}>
-                                    <button 
-                                        onClick={() => handleDelete(artist.name)}
-                                        style={{
-                                            padding: "6px 12px", border: "1px solid #fee2e2", background: "#fff1f2",
-                                            color: "#e11d48", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "bold"
-                                        }}
-                                    >
-                                        삭제
-                                    </button>
-                                </td>
-                            </tr>
-                        ))
-                    ) : (
-                        <tr>
-                            <td colSpan={4} style={{ padding: "40px", textAlign: "center", color: "#9ca3af" }}>
-                                등록된 아티스트가 없습니다.
-                            </td>
-                        </tr>
-                    )}
-                </tbody>
-            </table>
-        </div>
-      )}
+      <table style={{color: "#444", width: "100%", fontSize: "14px" }}>
+        <thead><tr style={{ background: "#f3f4f6" }}><th style={{ padding: "10px" }}>아티스트명</th><th style={{ padding: "10px" }}>관리</th></tr></thead>
+        <tbody>
+          {artists.map((a, i) => (
+            <tr key={i}><td style={{ padding: "10px" }}>{a.name}</td><td style={{ textAlign: "center" }}><button onClick={() => handleDelete(a.name)}>삭제</button></td></tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
 
 // ----------------------------------------------------------------------
-// 2. 💰 정산 기준 관리 (Placeholder)
+// 2. 💰 정산 기준 관리
 // ----------------------------------------------------------------------
 function SettlementManager() {
   return (
     <div style={{ textAlign: "center", padding: "60px 20px", color: "#9ca3af" }}>
-      <h3 style={{ marginBottom: "10px", color: "#374151" }}>🚧 준비 중인 기능입니다</h3>
-      <p>일일 최대 인정 횟수(10회), 목표 곡수, 정산 상한액 등을 여기서 수정하게 될 예정입니다.</p>
+      <h3>🚧 준비 중인 기능입니다</h3>
     </div>
   );
 }
 
 // ----------------------------------------------------------------------
-// 3. 🏪 매장 관리 (Placeholder)
+// 3. 💿 플레이리스트 관리 컴포넌트 (사분할 썸네일 지원)
 // ----------------------------------------------------------------------
-function StoreManager() {
+function PlaylistManager() {
+  const [ytmUrl, setYtmUrl] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    id: "", title: "", genre: "재즈/라운지", industry: "카페",
+    energy: "MED" as "LOW" | "MED" | "HIGH",
+    vocal: "LOW" as "LOW" | "MED" | "HIGH",
+    duration: "", tracks: 0, tags: "", usecase: "", image: ""
+  });
+
+  const parseISO8601Duration = (isoDuration: string) => {
+    const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+    if (!match) return 0;
+    const hours = parseInt(match[1] || "0");
+    const minutes = parseInt(match[2] || "0");
+    const seconds = parseInt(match[3] || "0");
+    return hours * 3600 + minutes * 60 + seconds;
+  };
+
+  const fetchPlaylistData = async () => {
+    try {
+      const urlObj = new URL(ytmUrl);
+      const listId = urlObj.searchParams.get("list");
+      if (!listId) return alert("올바른 유튜브 뮤직 주소를 입력하세요.");
+
+      setLoading(true);
+      const API_KEY = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
+
+      // 1. 플레이리스트 기본 정보 (사분할 썸네일 추출 포인트)
+      const resBase = await fetch(`https://www.googleapis.com/youtube/v3/playlists?part=snippet,contentDetails&id=${listId}&key=${API_KEY}`);
+      const dataBase = await resBase.json();
+      
+      if (!dataBase.items || dataBase.items.length === 0) throw new Error("플레이리스트를 찾을 수 없습니다.");
+      
+      const item = dataBase.items[0];
+      const snippet = item.snippet;
+
+      // ✅ [개선] 사분할 썸네일 우선 추출 (maxres/standard 순)
+      const thumbs = snippet.thumbnails;
+      const officialImage = thumbs.maxres?.url || thumbs.standard?.url || thumbs.high?.url || thumbs.default?.url;
+
+      // 2. 플레이리스트 아이템 ID 리스트 (최대 50개)
+      const resItems = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails&maxResults=50&playlistId=${listId}&key=${API_KEY}`);
+      const dataItems = await resItems.json();
+      const videoIds = dataItems.items.map((i: any) => i.contentDetails.videoId).join(",");
+
+      // 3. 비디오 상세 정보 합산
+      const resVideos = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${videoIds}&key=${API_KEY}`);
+      const dataVideos = await resVideos.json();
+
+      let totalSeconds = 0;
+      dataVideos.items.forEach((v: any) => {
+        totalSeconds += parseISO8601Duration(v.contentDetails.duration);
+      });
+
+      const h = Math.floor(totalSeconds / 3600);
+      const m = Math.floor((totalSeconds % 3600) / 60);
+
+      setFormData({
+        ...formData,
+        id: listId.substring(0, 10),
+        title: snippet.title,
+        tracks: item.contentDetails.itemCount,
+        image: officialImage, 
+        duration: h > 0 ? `${h}시간 ${m}분` : `${m}분`
+      });
+
+      alert("🎉 정보를 성공적으로 가져왔습니다!");
+    } catch (e: any) {
+      alert(e.message || "오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.id || !formData.image) return alert("필수 정보가 부족합니다.");
+
+    try {
+      const finalTags = typeof formData.tags === "string" 
+        ? formData.tags.split(",").map(t => t.trim()).filter(t => t !== "") 
+        : formData.tags;
+
+      await setDoc(doc(db, "playlists", formData.id), {
+        ...formData,
+        tags: finalTags,
+        ytmUrl,
+        clicks: 0,
+        createdAt: new Date().toISOString()
+      });
+      alert("등록 성공! 🚀");
+      setYtmUrl("");
+    } catch (e) { alert("저장 실패"); }
+  };
+
   return (
-    <div style={{ textAlign: "center", padding: "60px 20px", color: "#9ca3af" }}>
-      <h3 style={{ marginBottom: "10px", color: "#374151" }}>🚧 준비 중인 기능입니다</h3>
-      <p>점주님 계정 추가, 정보 수정, 삭제 기능을 제공할 예정입니다.</p>
+    <div>
+      <h3 style={{color: "#444", fontSize: "18px", fontWeight: "bold", marginBottom: "20px" }}>💿 플레이리스트 등록</h3>
+      
+      <div style={{ display: "flex", gap: "10px", marginBottom: "30px", padding: "20px", background: "#f3f4f6", borderRadius: "8px" }}>
+        <input type="text" placeholder="유튜브 뮤직 주소 입력" value={ytmUrl} onChange={(e) => setYtmUrl(e.target.value)} style={inputStyle} />
+        <button onClick={fetchPlaylistData} disabled={loading} style={primaryBtnStyle}>{loading ? "계산 중..." : "자동 정보 로드"}</button>
+      </div>
+
+      <form onSubmit={handleSave} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
+        <div style={{ gridColumn: "span 2" }}>
+          <label style={formLabelStyle}>제목 (수정 가능)</label>
+          <input type="text" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} style={inputStyle} />
+        </div>
+
+        <div style={{ gridColumn: "span 2" }}>
+          <label style={formLabelStyle}>썸네일 이미지 URL (사분할이 아니면 직접 수정)</label>
+          <input type="text" value={formData.image} onChange={e => setFormData({...formData, image: e.target.value})} style={inputStyle} />
+        </div>
+        
+        <div>
+          <label style={formLabelStyle}>재생 시간</label>
+          <input type="text" value={formData.duration} onChange={e => setFormData({...formData, duration: e.target.value})} style={inputStyle} />
+        </div>
+        
+        <div>
+          <label style={formLabelStyle}>트랙 수</label>
+          <input type="number" value={formData.tracks} onChange={e => setFormData({...formData, tracks: Number(e.target.value)})} style={inputStyle} />
+        </div>
+
+        <div>
+          <label style={formLabelStyle}>장르</label>
+          <input type="text" value={formData.genre} onChange={e => setFormData({...formData, genre: e.target.value})} style={inputStyle} />
+        </div>
+
+        <div>
+          <label style={formLabelStyle}>적합 업종</label>
+          <input type="text" value={formData.industry} onChange={e => setFormData({...formData, industry: e.target.value})} style={inputStyle} />
+        </div>
+
+        <div style={{ gridColumn: "span 2" }}>
+          <label style={formLabelStyle}>태그 (쉼표로 구분)</label>
+          <input type="text" placeholder="오후, 산뜻한, 연주곡" value={formData.tags} onChange={e => setFormData({...formData, tags: e.target.value})} style={inputStyle} />
+        </div>
+
+        {formData.image && (
+          <div style={{ gridColumn: "span 2" }}>
+            <label style={formLabelStyle}>미리보기</label>
+            <img src={formData.image} alt="Thumbnail" style={{ width: "240px", aspectRatio: "1/1", objectFit: "cover", borderRadius: "8px", border: "1px solid #ddd" }} />
+          </div>
+        )}
+
+        <button type="submit" style={{ ...primaryBtnStyle, gridColumn: "span 2", padding: "15px" }}>최종 DB 등록하기</button>
+      </form>
     </div>
   );
 }
@@ -240,28 +276,15 @@ function StoreManager() {
 // ----------------------------------------------------------------------
 // 스타일 컴포넌트 & 상수
 // ----------------------------------------------------------------------
+const formLabelStyle = { display: "block", marginBottom: "8px", fontSize: "13px", fontWeight: "600", color: "#4b5563" };
+
 function TabButton({ label, isActive, onClick }: any) {
   return (
-    <button 
-      onClick={onClick}
-      style={{
-        padding: "10px 20px", borderRadius: "8px", border: "none", cursor: "pointer",
-        fontWeight: "bold", fontSize: "15px",
-        background: isActive ? "#1f2937" : "transparent",
-        color: isActive ? "white" : "#6b7280",
-        transition: "all 0.2s"
-      }}
-    >
+    <button onClick={onClick} style={{ padding: "10px 20px", borderRadius: "8px", border: "none", cursor: "pointer", fontWeight: "bold", fontSize: "15px", background: isActive ? "#1f2937" : "transparent", color: isActive ? "white" : "#6b7280", transition: "all 0.2s" }}>
       {label}
     </button>
   );
 }
 
-const inputStyle = { 
-  flex: 1, padding: "12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "15px", outline: "none" 
-};
-
-const primaryBtnStyle = { 
-  background: "#3b82f6", color: "white", border: "none", padding: "0 24px", 
-  borderRadius: "6px", cursor: "pointer", fontWeight: "bold", fontSize: "15px" 
-};
+const inputStyle = { flex: 1, padding: "12px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "15px", outline: "none", width: "100%" };
+const primaryBtnStyle = { background: "#3b82f6", color: "white", border: "none", padding: "0 24px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold", fontSize: "15px" };

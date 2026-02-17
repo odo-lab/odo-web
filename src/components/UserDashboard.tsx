@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -13,11 +14,10 @@ interface UserDashboardProps {
 
 export default function UserDashboard({ targetId, isAdmin = false }: UserDashboardProps) {
   const router = useRouter();
-  const [loading, setLoading] = useState(false); // 데이터 로딩
-  const [syncing, setSyncing] = useState(false); // 동기화 중
+  const [loading, setLoading] = useState(true); // 초기 상태를 true로 설정
+  const [syncing, setSyncing] = useState(false);
   const [storeInfo, setStoreInfo] = useState<any>(null);
   
-  // 통계 상태 (이번달, 정산금, 달성률 등)
   const [stats, setStats] = useState({ 
     playCount: 0, 
     revenue: 0, 
@@ -26,7 +26,6 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
   
   const [chartData, setChartData] = useState<any[]>([]);
 
-  // 📅 날짜 포맷팅
   const formatYMD = (date: Date) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -34,7 +33,6 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
     return `${year}-${month}-${day}`;
   };
 
-  // 🗓️ 기본 조회 기간: 이번 달 1일 ~ 어제
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(today.getDate() - 1);
@@ -44,12 +42,9 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
     end: formatYMD(yesterday)
   });
 
-  // 💰 정산금 계산 로직 (관리자 페이지와 동일)
   const calculateRevenue = (franchise: string, plays: number) => {
-    let maxRevenue = 30000; // 개인/기타
-    if (franchise === 'seveneleven') {
-        maxRevenue = 22000;
-    }
+    let maxRevenue = 30000;
+    if (franchise === 'seveneleven') maxRevenue = 22000;
 
     if (plays < 2500) return 0;
     else if (plays < 5000) return Math.floor(maxRevenue / 3);
@@ -57,7 +52,6 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
     else return maxRevenue;
   };
 
-  // 초기 로딩: 매장 정보 가져오기 -> 데이터 조회
   useEffect(() => {
     async function initData() {
       if (!targetId) return;
@@ -89,6 +83,11 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
           await fetchDashboardData(realLastfmId, dateRange.start, dateRange.end, storeData.franchise);
         } else {
           setStoreInfo(null);
+          // 🚨 [수정 포인트] 정보가 없는데 어드민이면 리다이렉트
+          if (isAdmin) {
+            alert("해당 매장 정보를 찾을 수 없어 대시보드로 이동합니다.");
+            router.push("/admin/dashboard");
+          }
         }
       } catch (error) {
         console.error("로딩 에러:", error);
@@ -97,7 +96,7 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
       }
     }
     initData();
-  }, [targetId]);
+  }, [targetId, isAdmin]);
 
   const getDatesInRange = (startDate: Date, endDate: Date) => {
     const dates = [];
@@ -105,7 +104,6 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
     theDate.setHours(0,0,0,0);
     const end = new Date(endDate);
     end.setHours(0,0,0,0);
-
     while (theDate <= end) {
       const offset = new Date().getTimezoneOffset() * 60000;
       const dateStr = new Date(theDate.getTime() - offset).toISOString().split('T')[0];
@@ -115,24 +113,17 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
     return dates;
   };
 
-  // 🚀 데이터 조회 함수
   const fetchDashboardData = async (lastfmId: string, startStr: string, endStr: string, franchise: string) => {
     setLoading(true);
     try {
         const statsColl = collection(db, "daily_stats");
-        const qStats = query(
-            statsColl, 
-            where("date", ">=", startStr),
-            where("date", "<=", endStr)
-        );
+        const qStats = query(statsColl, where("date", ">=", startStr), where("date", "<=", endStr));
         const statsSnap = await getDocs(qStats);
         
         const myStats: any[] = [];
         statsSnap.forEach(doc => {
             const d = doc.data();
-            if (d.lastfm_username === lastfmId || d.userId === lastfmId) {
-                myStats.push(d);
-            }
+            if (d.lastfm_username === lastfmId || d.userId === lastfmId) myStats.push(d);
         });
 
         const requiredDates = getDatesInRange(new Date(startStr), new Date(endStr));
@@ -151,26 +142,18 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
             plays: chartMap[date]
         }));
 
-        // 정산금 및 달성률 계산
         const estimatedRevenue = calculateRevenue(franchise || 'personal', totalCount);
         const achievementRate = Math.min((totalCount / 7500) * 100, 100);
 
-        setStats({
-            playCount: totalCount,
-            revenue: estimatedRevenue,
-            achievementRate: achievementRate
-        });
+        setStats({ playCount: totalCount, revenue: estimatedRevenue, achievementRate: achievementRate });
         setChartData(finalChartData);
-
     } catch (e) {
         console.error(e);
     } finally {
         setLoading(false);
     }
   };
-
-  // 🛠️ 데이터 동기화 함수
-  const syncData = async () => {
+const syncData = async () => {
       if (!storeInfo) return;
       const lastfmId = storeInfo.id;
       
@@ -257,19 +240,42 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
           setSyncing(false);
       }
   };
+  // 🚨 초기 로딩 대응
+  if (loading && !storeInfo) {
+    return <div style={{ padding: 100, textAlign: "center", color: "#888" }}>⏳ 데이터를 불러오고 있습니다...</div>;
+  }
 
-  if (!storeInfo) return <div style={{ padding: 40, textAlign: "center", color: "white" }}>{loading ? "로딩 중..." : "매장 정보를 찾을 수 없습니다."}</div>;
-
+  // 🚨 정보 없음 대응
+  if (!storeInfo) {
+    return (
+      <div style={{ padding: 100, textAlign: "center", color: "white" }}>
+        <p style={{ marginBottom: 20 }}>매장 정보를 찾을 수 없습니다.</p>
+        <button onClick={() => router.push('/')} style={primaryBtnStyle}>메인으로 돌아가기</button>
+      </div>
+    );
+  }
+ 
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto", padding: "20px" }}>
-      {/* 뒤로가기 (관리자용) */}
+      {/* 어드민 전용 상단 바 */}
       {isAdmin && (
-        <button 
-          onClick={() => router.back()}
-          style={{ marginBottom: "20px", background: "none", border: "none", color: "#888", cursor: "pointer", fontSize: "14px" }}
-        >
-          ← 목록으로 돌아가기
-        </button>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "20px" }}>
+          <button 
+            onClick={() => router.back()}
+            style={{ background: "none", border: "none", color: "#888", cursor: "pointer", fontSize: "14px", display: "flex", alignItems: "center", gap: "5px" }}
+          >
+            ← 목록으로 돌아가기
+          </button>
+          
+          {/* 어드민만 볼 수 있는 데이터 강제 동기화 버튼 */}
+          <button 
+            onClick={syncData} 
+            disabled={syncing}
+            style={{ ...primaryBtnStyle, background: syncing ? "#444" : "#ef4444", fontSize: "12px" }}
+          >
+            {syncing ? "🔄 동기화 중..." : "⚠️ 데이터 재산출"}
+          </button>
+        </div>
       )}
 
       {/* 헤더 */}
@@ -282,19 +288,24 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
         </div>
       </header>
 
-      {/* 날짜 컨트롤 & 동기화 */}
+      {/* 날짜 컨트롤 */}
       <div style={filterContainerStyle}>
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
           <span style={{ color: "#ccc", fontSize: "14px", fontWeight: "bold" }}>기간 조회</span>
           <input type="date" value={dateRange.start} onChange={(e)=>setDateRange({...dateRange, start:e.target.value})} style={inputStyle} />
           <span style={{ color: "#888" }}>~</span>
           <input type="date" value={dateRange.end} onChange={(e)=>setDateRange({...dateRange, end:e.target.value})} style={inputStyle} />
-          <button onClick={() => fetchDashboardData(storeInfo.id, dateRange.start, dateRange.end, storeInfo.franchise)} style={primaryBtnStyle}>조회</button>
+          <button 
+            onClick={() => fetchDashboardData(storeInfo.id, dateRange.start, dateRange.end, storeInfo.franchise)} 
+            disabled={loading}
+            style={primaryBtnStyle}
+          >
+            {loading ? "조회 중..." : "조회"}
+          </button>
         </div>
-       
       </div>
 
-      {/* 📊 [1] 달성률 섹션 (프로그래스 바) */}
+      {/* 📊 달성률 섹션 */}
       <div style={{ background: "#222", padding: "25px", borderRadius: "16px", border: "1px solid #333", marginBottom: "20px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
             <div>
@@ -304,71 +315,33 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
                 <div style={{ color: "#888", fontSize: "13px" }}>목표 7,500곡 / 현재 {stats.playCount.toLocaleString()}곡</div>
             </div>
             
-            {/* Last.fm 바로가기 버튼 */}
-            <a 
-                href={`https://www.last.fm/user/${storeInfo.id}`} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                style={{
-                    background: "#333", color: "#ccc", padding: "8px 16px", borderRadius: "8px", 
-                    textDecoration: "none", fontSize: "13px", border: "1px solid #444", display: "flex", alignItems: "center", gap: "6px"
-                }}
-            >
+            <a href={`https://www.last.fm/user/${storeInfo.id}`} target="_blank" rel="noopener noreferrer" style={lastfmBtnStyle}>
                 🎵 Last.fm 상세
             </a>
         </div>
 
-        {/* 커스텀 프로그래스 바 */}
         <div style={{ position: "relative", height: "24px", background: "#444", borderRadius: "12px", overflow: "hidden" }}>
-            {/* 진행 막대 */}
             <div style={{ 
                 width: `${stats.achievementRate}%`, 
                 height: "100%", 
                 background: "linear-gradient(90deg, #3b82f6 0%, #10b981 100%)",
                 transition: "width 0.5s ease-in-out"
             }} />
-            
-            {/* 1/3 지점 (2500곡) */}
             <div style={{ position: "absolute", left: "33.3%", top: 0, bottom: 0, borderLeft: "2px dashed rgba(255,255,255,0.3)" }} />
-            <div style={{ position: "absolute", left: "34%", top: "4px", fontSize: "10px", color: "rgba(255,255,255,0.5)" }}>2500</div>
-
-            {/* 2/3 지점 (5000곡) */}
             <div style={{ position: "absolute", left: "66.6%", top: 0, bottom: 0, borderLeft: "2px dashed rgba(255,255,255,0.3)" }} />
-            <div style={{ position: "absolute", left: "67%", top: "4px", fontSize: "10px", color: "rgba(255,255,255,0.5)" }}>5000</div>
         </div>
       </div>
 
-      {/* 💳 [2] 통계 카드 그리드 */}
+      {/* 💳 통계 카드 */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "20px", marginBottom: "30px" }}>
-        {/* 재생수 */}
-        <StatCard 
-            title="이번 달 재생 수" 
-            count={`${stats.playCount.toLocaleString()} 곡`} 
-            color="#3b82f6" 
-            subText={`${dateRange.start} ~ ${dateRange.end}`} 
-        />
-        {/* 정산금 (강조) */}
-        <StatCard 
-            title="예상 정산금" 
-            count={`${stats.revenue.toLocaleString()} 원`} 
-            color="#10b981" 
-            subText="구간별 차등 지급 적용됨" 
-            isHighlight={true}
-        />
-        {/* 지난달 (현재는 0 처리) */}
-        <StatCard 
-            title="지난 달 리포트" 
-            count="준비 중" 
-            color="#9ca3af" 
-            subText="다음 업데이트 예정" 
-        />
+        <StatCard title="조회 기간 재생 수" count={`${stats.playCount.toLocaleString()} 곡`} color="#3b82f6" subText="유효 재생수 합계" />
+        <StatCard title="예상 정산금" count={`${stats.revenue.toLocaleString()} 원`} color="#10b981" subText="구간별 차등 지급 적용" isHighlight={true} />
+        <StatCard title="정산 상태" count={stats.playCount >= 7500 ? "최대 달성" : "진행 중"} color="#9ca3af" subText="매월 1일 최종 확정" />
       </div>
 
-      {/* 📈 [3] 차트 섹션 */}
+      {/* 📈 차트 */}
       <div style={{ background: "#222", padding: "30px", borderRadius: "16px", border: "1px solid #333" }}>
-        <h3 style={{ fontSize: "18px", fontWeight: "bold", color: "white", marginBottom: "20px" }}>
-          📈 일별 재생 추이
-        </h3>
+        <h3 style={{ fontSize: "18px", fontWeight: "bold", color: "white", marginBottom: "20px" }}>📈 일별 재생 추이</h3>
         <div style={{ height: "300px", width: "100%" }}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData}>
@@ -385,22 +358,18 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
   );
 }
 
+// 스타일 보조 컴포넌트 및 객체
 function StatCard({ title, count, color, subText, isHighlight = false }: any) {
   return (
-    <div style={{ 
-        background: "#222", padding: "24px", borderRadius: "12px", 
-        borderTop: `4px solid ${color}`,
-        boxShadow: isHighlight ? "0 4px 20px rgba(16, 185, 129, 0.1)" : "none"
-    }}>
+    <div style={{ background: "#222", padding: "24px", borderRadius: "12px", borderTop: `4px solid ${color}`, boxShadow: isHighlight ? "0 4px 20px rgba(16, 185, 129, 0.1)" : "none" }}>
       <h4 style={{ color: "#aaa", fontSize: "14px", marginBottom: "8px" }}>{title}</h4>
-      <div style={{ fontSize: "28px", fontWeight: "bold", color: isHighlight ? "#10b981" : "white", marginBottom: "4px" }}>
-        {count}
-      </div>
+      <div style={{ fontSize: "28px", fontWeight: "bold", color: isHighlight ? "#10b981" : "white", marginBottom: "4px" }}>{count}</div>
       <div style={{ fontSize: "12px", color: "#666" }}>{subText}</div>
     </div>
   );
 }
 
+const lastfmBtnStyle = { background: "#333", color: "#ccc", padding: "8px 16px", borderRadius: "8px", textDecoration: "none", fontSize: "13px", border: "1px solid #444", display: "flex", alignItems: "center", gap: "6px" };
 const filterContainerStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", background: "#222", padding: "15px 20px", borderRadius: "12px", border: "1px solid #333" };
 const inputStyle = { border: "1px solid #444", background: "#333", color: "white", borderRadius: "6px", padding: "8px 10px", fontSize: "14px", outline: "none" };
 const primaryBtnStyle = { background: "#3b82f6", color: "white", border: "none", padding: "8px 16px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" };

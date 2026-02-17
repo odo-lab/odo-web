@@ -16,7 +16,28 @@
   width: 100%;
   max-width: 720px;
 }
+.headerWrap {
+  position: fixed; /* 화면에 고정 */
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 1000;
+  transition: transform 0.4s ease-in-out; /* 나타나고 사라질 때 부드럽게 */
+}
 
+.headerBar {
+  width: 100%;
+  /* 배경을 약간 투명하게 하여 뒤에 내용이 비치게 하면 더 예쁩니다 */
+  background: rgba(0, 0, 0, 0.8); 
+  backdrop-filter: blur(10px); /* 유리 효과 */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.3s ease;
+}
+
+/* 아래로 스크롤 시 숨겨지는 클래스 */
+.headerHidden {
+  transform: translateY(-100%);
+}
 
 .tipKicker{
   font-size: 12px;

@@ -61,6 +61,7 @@ export default function HomeClient() {
     <>
       <section>
         {/* ✅ 이벤트 배너 (기존 heroBanner 대체) */}
+        <section style={{ paddingTop: "30px" }}></section>
         <EventBanner items={HERO_BANNERS} autoPlay intervalMs={5000} />
 
         {/* NOW */}

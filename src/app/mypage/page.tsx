@@ -19,7 +19,7 @@ export default function MyPage() {
   if (!user) return null;
 
   return (
-    <section style={{ width: "100%", minHeight: "100vh", backgroundColor: "#111" }}>
+    <section style={{ width: "100%", minHeight: "100vh", backgroundColor: "#000" }}>
       {/* 점주 본인의 UID를 넘겨줍니다 */}
       <UserDashboard targetId={user.uid} isAdmin={false} />
     </section>

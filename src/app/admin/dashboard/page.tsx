@@ -344,7 +344,7 @@ export default function AdminDashboardPage() {
       
       <div style={filterContainerStyle}>
         <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          <h2 style={{ fontSize: "18px", fontWeight: "bold", margin: 0, marginRight: "10px" }}>통계 조회</h2>
+          <h2 style={{color: "#444", fontSize: "18px", fontWeight: "bold", margin: 0, marginRight: "10px" }}>통계 조회</h2>
           <input type="date" value={dateRange.start} onChange={(e)=>setDateRange({...dateRange, start:e.target.value})} style={inputStyle} />
           <span style={{ color: "#888" }}>~</span>
           <input type="date" value={dateRange.end} onChange={(e)=>setDateRange({...dateRange, end:e.target.value})} style={inputStyle} />
@@ -367,7 +367,7 @@ export default function AdminDashboardPage() {
       )}
 
       <div style={sectionBoxStyle}>
-        <h3 style={{ fontSize: "16px", fontWeight: "bold", marginBottom: "20px" }}>📈 전체 재생 추이</h3>
+        <h3 style={{ color: "#444",fontSize: "16px", fontWeight: "bold", marginBottom: "20px" }}>📈 전체 재생 추이</h3>
         <div style={{ width: "100%", height: "300px" }}>
           <ResponsiveContainer>
             <LineChart data={chartData}>
@@ -383,7 +383,7 @@ export default function AdminDashboardPage() {
       </div>
 
       <div style={sectionBoxStyle}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
+        <div style={{ color: "#444",display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
             <h3 style={{ fontSize: "16px", fontWeight: "bold" }}>사용자별 현황</h3>
             <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
                 <div style={downloadButtonGroupStyle}>

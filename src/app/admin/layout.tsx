@@ -12,10 +12,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // 🕵️‍♂️ [추가된 로직] 현재 페이지가 로그인 페이지인지 확인
   const isLoginPage = pathname === "/admin/login";
 
-  // ✅ 로그인 페이지라면? 사이드바 없이 내용물(로그인 폼)만 쌩으로 보여줍니다.
   if (isLoginPage) {
     return (
       <div style={{ minHeight: "100vh", backgroundColor: "#111827" }}>
@@ -24,7 +22,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  // 👇 로그인 페이지가 아닐 때만 아래 사이드바 레이아웃을 렌더링합니다.
   const menuItems = [
     { name: "매장 통계", href: "/admin/dashboard", icon: "📊" },
     { name: "데이터 검증", href: "/admin/validator", icon: "🚨" },
@@ -34,11 +31,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="admin-container">
-      {/* ⬛️ 사이드바 */}
+      {/* ⬛️ 사이드바 (고정됨) */}
       <aside className="admin-sidebar">
         
         <div className="sidebar-header">
-          {/* 🏠 [수정됨] 클릭 시 새로고침하며 홈으로 이동 */}
           <h1 
             className="logo-text"
             onClick={() => router.push('/admin/dashboard')}
@@ -72,13 +68,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               );
             })}
           </ul>
-          
+        </nav>
+
+        {/* 底部 하단 영역: 메인 복귀 + 로그아웃 */}
+        <div className="sidebar-footer">
+          {/* 🏠 서비스 메인으로 돌아가는 버튼 */}
+          <button 
+            onClick={() => router.push('/')} 
+            className="exit-btn"
+            title="사용자 사이트로 이동"
+          >
+            <span style={{ fontSize: '14px' }}></span> 서비스 메인으로
+          </button>
+
           <div className="logout-area">
             <button onClick={logout} className="logout-btn">
               로그아웃
             </button>
           </div>
-        </nav>
+        </div>
       </aside>
 
       {/* ⬜️ 메인 콘텐츠 */}
@@ -86,12 +94,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {children}
       </main>
 
-      {/* 🎨 스타일 (CSS-in-JS) */}
       <style jsx>{`
         .admin-container {
           display: flex;
           min-height: 100vh;
-          background-color: #ffffff;
+          background-color: #f9fafb; /* 본문 배경을 살짝 밝은 회색으로 주면 더 고급짐 */
         }
 
         .admin-sidebar {
@@ -100,8 +107,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           color: white;
           display: flex;
           flex-direction: column;
-          flex-shrink: 0;
-          transition: all 0.3s;
+          
+          /* ✅ 사이드바 고정 핵심 로직 */
+          position: fixed; 
+          top: 0;
+          left: 0;
+          bottom: 0;
+          z-index: 100;
         }
 
         .sidebar-header {
@@ -116,15 +128,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           font-size: 20px;
           font-weight: bold;
           margin: 0;
-        }
-
-        .mobile-toggle {
-          display: none;
-          background: none;
-          border: none;
-          color: white;
-          font-size: 24px;
-          cursor: pointer;
+          color: #f3f4f6;
         }
 
         .sidebar-nav {
@@ -137,10 +141,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           list-style: none;
           padding: 0;
           margin: 0;
-        }
-
-        .sidebar-nav li {
-          margin-bottom: 5px;
         }
 
         .nav-link {
@@ -166,55 +166,81 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           font-weight: bold;
         }
 
-        .logout-area {
-          padding: 20px;
+        /* ✅ 하단 버튼 영역 스타일 */
+        .sidebar-footer {
+          padding: 16px;
           border-top: 1px solid #374151;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        }
+
+        .exit-btn {
+          width: 100%;
+          padding: 12px;
+          background-color: #374151;
+          border: 1px solid #4b5563;
+          border-radius: 8px;
+          color: #e5e7eb;
+          font-size: 13px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          transition: all 0.2s;
+        }
+
+        .exit-btn:hover {
+          background-color: #4b5563;
+          border-color: #6b7280;
+          color: white;
+        }
+
+        .logout-area {
+          padding: 0;
         }
 
         .logout-btn {
           width: 100%;
           padding: 10px;
           background: transparent;
-          border: 1px solid #4b5563;
+          border: 1px solid transparent;
           border-radius: 6px;
           color: #9ca3af;
+          font-size: 13px;
           cursor: pointer;
+          text-decoration: underline;
+        }
+
+        .logout-btn:hover {
+          color: #ef4444;
         }
 
         .admin-content {
           flex: 1;
-          overflow-y: auto;
+          /* ✅ 사이드바 너비만큼 왼쪽 마진을 주어 가려지지 않게 함 */
+          margin-left: 260px; 
           padding: 0;
+          min-height: 100vh;
         }
 
-        @media (max-width: 768px) {
-          .admin-container {
-            flex-direction: column;
-          }
+        .mobile-toggle { display: none; background: none; border: none; color: white; font-size: 24px; cursor: pointer; }
 
+        @media (max-width: 768px) {
           .admin-sidebar {
             width: 100%;
             height: auto;
+            position: relative; /* 모바일에서는 다시 풀어줌 */
           }
-
-          .mobile-toggle {
-            display: block;
-          }
-
-          .sidebar-nav {
-            display: none;
-            padding: 0;
-          }
-
-          .sidebar-nav.open {
-            display: block;
-            padding: 10px;
-            border-bottom: 1px solid #374151;
-          }
-          
           .admin-content {
-             min-height: calc(100vh - 80px); 
+            margin-left: 0;
+            min-height: auto;
           }
+          .mobile-toggle { display: block; }
+          .sidebar-nav { display: none; }
+          .sidebar-nav.open { display: block; }
+          .sidebar-footer { display: ${mobileMenuOpen ? 'flex' : 'none'}; }
         }
       `}</style>
     </div>

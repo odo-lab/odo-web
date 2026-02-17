@@ -10,10 +10,10 @@ export const metadata = {
     title: "ODO - 매장용 플레이리스트",
     description: "점주 운영형 플레이리스트 선택 콘솔 (Prototype)",
     type: "website",
-    url: "https://odo-next.vercel.app/odo.png",
+    url: "https://onedayofmusic.com/odo.png",
     images: [
       {
-        url: "https://odo-next.vercel.app/odo.png",
+        url: "https://onedayofmusic.com/odo.png",
         width: 1200,
         height: 630,
         alt: "ODO",
@@ -24,7 +24,7 @@ export const metadata = {
     card: "summary_large_image",
     title: "ODO - 매장용 플레이리스트",
     description: "점주 운영형 플레이리스트 선택 콘솔 (Prototype)",
-    images: ["https://odo-next.vercel.app/odo.png"],
+    images: ["https://onedayofmusic.com/odo.png"],
   },
 };
 

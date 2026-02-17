@@ -408,7 +408,7 @@ main{ padding:28px 0 56px; }
   border-radius: 22px;
   overflow: hidden;
   border: 1px solid rgba(255,255,255,.10);
-  background: linear-gradient(135deg, rgba(59,130,246,.35), rgba(37,99,235,.25));
+  background: linear-gradient(135deg, rgba(170, 177, 187, 0.35), rgba(180, 183, 190, 0.25));
   box-shadow: 0 18px 40px rgba(0,0,0,.35);
 }
 
@@ -438,10 +438,11 @@ main{ padding:28px 0 56px; }
 }
 
 .ebOverlay{
-  position:absolute;
-  inset:0;
-  z-index: 2;
-  background: radial-gradient(1200px 300px at 70% 50%, rgba(0,0,0,.15), rgba(0,0,0,.55));
+  background:
+    linear-gradient(180deg,
+      rgba(255,255,255,.06),
+      rgba(0,0,0,.10)
+    );
 }
 
 /* ✅ 네비: 버튼 UI 제거 + 가장자리 hover 그라데이션만 */
