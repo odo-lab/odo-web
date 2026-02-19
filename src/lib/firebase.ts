@@ -12,7 +12,6 @@ const firebaseConfig = {
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
-
 // Next.js는 서버/클라이언트 양쪽에서 실행되므로 중복 초기화를 막기 위한 코드입니다.
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 

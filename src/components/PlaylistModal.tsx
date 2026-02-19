@@ -2,8 +2,24 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Playlist } from "@/lib/playlists";
 import { useEffect } from "react";
+
+// 💡 lib/playlists.ts 에 의존하지 않도록 Playlist 타입을 직접 선언합니다.
+export type Playlist = {
+  id: string;
+  title: string;
+  genre: string;
+  industry: string;
+  energy?: string;
+  vocal?: string;
+  duration: string;
+  tracks: number;
+  tags: string[] | string;
+  usecase?: string;
+  ytmUrl: string;
+  image: string;
+  clicks?: number;
+};
 
 export default function PlaylistModal({
   open,
@@ -28,6 +44,11 @@ export default function PlaylistModal({
   if (!open || !playlist) return null;
 
   const hasUrl = Boolean(playlist.ytmUrl && playlist.ytmUrl.trim().length > 0);
+  
+  // ✅ DB에서 배열이 아닌 문자열로 tags가 넘어올 경우를 대비한 안전 장치
+  const tagsString = Array.isArray(playlist.tags) 
+    ? playlist.tags.join(" · ") 
+    : playlist.tags || "";
 
   return (
     <div
@@ -90,6 +111,7 @@ export default function PlaylistModal({
                 fill
                 style={{ objectFit: "cover", opacity: 0.95 }}
                 priority
+                unoptimized={playlist.image.includes("ytimg.com") || playlist.image.includes("firebasestorage")}
               />
             </Link>
           ) : (
@@ -100,6 +122,7 @@ export default function PlaylistModal({
                 fill
                 style={{ objectFit: "cover", opacity: 0.95 }}
                 priority
+                unoptimized={playlist.image.includes("ytimg.com") || playlist.image.includes("firebasestorage")}
               />
             </div>
           )}
@@ -133,7 +156,8 @@ export default function PlaylistModal({
 
               <div className="info-box">
                 <b>태그</b>
-                <span>{playlist.tags.join(" · ")}</span>
+                {/* ✅ 수정된 tagsString 변수를 사용합니다 */}
+                <span>{tagsString}</span>
               </div>
             </div>
 
@@ -143,21 +167,6 @@ export default function PlaylistModal({
               <br />
               재생은 카드 클릭을 통해 YouTube Music에서 직접 진행됩니다.
             </div>
-
-            {/* (선택) 텍스트 링크도 추가하고 싶으면 아래 주석 해제
-            {hasUrl && (
-              <div style={{ marginTop: 12 }}>
-                <a
-                  href={playlist.ytmUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ textDecoration: "underline" }}
-                >
-                  YouTube Music에서 열기
-                </a>
-              </div>
-            )}
-            */}
           </div>
         </div>
       </div>
