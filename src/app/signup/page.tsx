@@ -1,19 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
-import { createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
+import { onAuthStateChanged } from "firebase/auth";
 
 export default function SignUpPage() {
   const router = useRouter();
   
-  // 입력 폼 상태 (이메일 없음, 아이디만 있음)
+  // 구글 로그인된 유저 정보 저장
+  const [googleUser, setGoogleUser] = useState<any>(null);
+
+  // 입력 폼 (비밀번호 제거됨)
   const [formData, setFormData] = useState({
-    id: "",           // Last.fm 아이디
-    password: "",
-    confirmPassword: "",
+    id: "",           // Last.fm 아이디 (필수)
     storeName: "",
     ownerName: ""
   });
@@ -21,85 +22,89 @@ export default function SignUpPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSignUp = async (e: React.FormEvent) => {
+  // 1. 페이지 로드 시 로그인 상태 확인
+  // (로그인 안 된 상태로 주소 치고 들어오면 튕겨내기)
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setGoogleUser(user);
+        console.log("현재 로그인된 사용자:", user.email);
+      } else {
+        alert("로그인 정보가 없습니다. 로그인 페이지로 이동합니다.");
+        router.push("/login");
+      }
+    });
+    return () => unsubscribe();
+  }, [router]);
+
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!googleUser) return;
+
     setLoading(true);
     setError("");
 
-    // 1. 비밀번호 확인
-    if (formData.password !== formData.confirmPassword) {
-      setError("비밀번호가 일치하지 않습니다.");
-      setLoading(false);
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      setError("비밀번호는 6자리 이상이어야 합니다.");
-      setLoading(false);
-      return;
-    }
-
     try {
-      const docId = formData.id.trim(); // 공백 제거한 순수 아이디
+      const docId = formData.id.trim(); // Last.fm ID를 문서 키로 사용
       
-      // 2. 이미 존재하는 아이디인지 DB에서 먼저 체크 (중복 방지)
+      // 2. 이미 등록된 Last.fm 아이디인지 체크 (중복 방지)
       const docRef = doc(db, "monitored_users", docId);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
-        // 이미 문서가 있는데 uid까지 있다면 -> 이미 가입된 계정
-        if (docSnap.data().uid) {
-            setError("이미 가입된 아이디입니다. 로그인해주세요.");
+        const data = docSnap.data();
+        // 이미 다른 UID가 등록되어 있다면 -> 사용 불가
+        if (data.uid && data.uid !== googleUser.uid) {
+            setError("이미 다른 사용자가 등록한 Last.fm 아이디입니다.");
             setLoading(false);
             return;
         }
-        // 문서는 있는데 uid가 없다면? -> 마이그레이션 대상자이므로 아래 로직 진행 (덮어쓰기)
+        // UID가 없다면? (기존 데이터 마이그레이션) -> 내 걸로 가져오기 가능
       }
 
-      // 3. [핵심] 아이디 + @odo.com 조합으로 Auth 계정 생성
-      const fakeEmail = `${docId}@odo.com`;
-      const userCredential = await createUserWithEmailAndPassword(auth, fakeEmail, formData.password);
-      const user = userCredential.user;
-
-      // 4. Firestore DB에 매장 정보 저장 (또는 업데이트)
-      // setDoc에 { merge: true } 옵션을 주어 기존 데이터가 있으면 유지하면서 uid만 추가
+      // 3. Firestore DB에 매장 정보 저장
+      // 비밀번호 저장 X, 대신 googleUser.uid와 email을 저장
       await setDoc(doc(db, "monitored_users", docId), {
-        uid: user.uid,
-        email: fakeEmail,         // 시스템 관리용 이메일
-        lastfm_username: docId,   // 순수 아이디
+        uid: googleUser.uid,            // 구글 UID (핵심 연결고리)
+        email: googleUser.email,        // 구글 이메일
+        lastfm_username: docId,         // 입력받은 Last.fm ID
         store_name: formData.storeName,
         owner_name: formData.ownerName,
         role: "user",
         active: true,
         created_at: new Date().toISOString(),
-        franchise: "personal"     // 기본값 (필요 시 선택박스로 변경 가능)
+        franchise: "personal" 
       }, { merge: true });
 
-      alert("회원가입이 완료되었습니다! 로그인 페이지로 이동합니다.");
-      router.push("/login");
+      alert("매장 정보 등록이 완료되었습니다! 마이페이지로 이동합니다.");
+      router.push("/mypage");
 
     } catch (err: any) {
-      console.error("회원가입 에러:", err);
-      if (err.code === 'auth/email-already-in-use') {
-        setError("이미 사용 중인 아이디입니다.");
-      } else {
-        setError("회원가입 중 오류가 발생했습니다. (" + err.message + ")");
-      }
+      console.error("등록 에러:", err);
+      setError("정보 등록 중 오류가 발생했습니다.");
       setLoading(false);
     }
   };
 
+  if (!googleUser) {
+    return <div style={{ padding: 50, textAlign: "center", color: "white" }}>로딩 중...</div>;
+  }
+
   return (
     <div style={{ maxWidth: "400px", margin: "50px auto", padding: "30px", background: "#1f2937", borderRadius: "12px", color: "white" }}>
-      <h1 style={{ fontSize: "24px", fontWeight: "bold", marginBottom: "30px", textAlign: "center" }}>
-        매장 등록 (회원가입)
+      <h1 style={{ fontSize: "24px", fontWeight: "bold", marginBottom: "10px", textAlign: "center" }}>
+        추가 정보 입력
       </h1>
+      <p style={{ textAlign: "center", color: "#9ca3af", marginBottom: "30px", fontSize: "14px" }}>
+        안녕하세요, <span style={{color:"#fff", fontWeight:"bold"}}>{googleUser.displayName || "점주"}</span>님!<br/>
+        서비스 이용을 위해 매장 정보를 입력해주세요.
+      </p>
 
-      <form onSubmit={handleSignUp} style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+      <form onSubmit={handleRegister} style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
         
         {/* 아이디 */}
         <div>
-          <label style={{display:"block", marginBottom:"5px", fontSize:"14px", color:"#9ca3af"}}>아이디 (Last.fm ID)</label>
+          <label style={{display:"block", marginBottom:"5px", fontSize:"14px", color:"#9ca3af"}}>Last.fm 아이디 <span style={{color:"#ef4444"}}>*</span></label>
           <input 
             type="text" 
             placeholder="예: hangyeol-7e" 
@@ -108,6 +113,7 @@ export default function SignUpPage() {
             required
             style={inputStyle}
           />
+          <p style={{fontSize:"11px", color:"#6b7280", marginTop:"4px"}}>* 실제 사용 중인 Last.fm 계정 아이디를 입력하세요.</p>
         </div>
 
         {/* 매장명 */}
@@ -136,46 +142,27 @@ export default function SignUpPage() {
           />
         </div>
 
-        {/* 비밀번호 */}
+        {/* 이메일 (읽기 전용) */}
         <div>
-          <label style={{display:"block", marginBottom:"5px", fontSize:"14px", color:"#9ca3af"}}>비밀번호</label>
-          <input 
-            type="password" 
-            placeholder="6자리 이상 입력" 
-            value={formData.password}
-            onChange={(e) => setFormData({...formData, password: e.target.value})}
-            required
-            style={inputStyle}
-          />
+           <label style={{display:"block", marginBottom:"5px", fontSize:"14px", color:"#9ca3af"}}>연동된 이메일</label>
+           <input 
+             type="text" 
+             value={googleUser.email || ""} 
+             disabled 
+             style={{...inputStyle, background: "#333", color: "#888", cursor: "not-allowed"}} 
+           />
         </div>
 
-        {/* 비밀번호 확인 */}
-        <div>
-          <label style={{display:"block", marginBottom:"5px", fontSize:"14px", color:"#9ca3af"}}>비밀번호 확인</label>
-          <input 
-            type="password" 
-            placeholder="비밀번호 다시 입력" 
-            value={formData.confirmPassword}
-            onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-            required
-            style={inputStyle}
-          />
-        </div>
-        
         {error && <div style={{ color: "#ef4444", fontSize: "14px", textAlign: "center", background: "rgba(239, 68, 68, 0.1)", padding: "10px", borderRadius: "6px" }}>{error}</div>}
 
         <button 
           type="submit" 
           disabled={loading}
-          style={{ ...buttonStyle, background: loading ? "#6b7280" : "#10b981" }}
+          style={{ ...buttonStyle, background: loading ? "#6b7280" : "#3b82f6" }}
         >
-          {loading ? "등록 중..." : "매장 등록 완료"}
+          {loading ? "저장 중..." : "정보 등록 완료"}
         </button>
       </form>
-
-      <div style={{ marginTop: "20px", textAlign: "center", fontSize: "14px" }}>
-        <a href="/login" style={{ color: "#60a5fa", textDecoration: "none" }}>이미 계정이 있으신가요? 로그인</a>
-      </div>
     </div>
   );
 }
