@@ -7,7 +7,6 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend 
 } from 'recharts';
-// 1. 엑셀 라이브러리 추가
 import * as XLSX from 'xlsx';
 
 export default function FranchiseDetailPage() {
@@ -17,8 +16,6 @@ export default function FranchiseDetailPage() {
 
   const [loading, setLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState("");
-
-  // 검색 상태 추가
   const [searchTerm, setSearchTerm] = useState("");
   const [filterKeyword, setFilterKeyword] = useState("");
 
@@ -45,13 +42,11 @@ export default function FranchiseDetailPage() {
   const [chartData, setChartData] = useState<any[]>([]);
   const [storeList, setStoreList] = useState<any[]>([]);
 
-  // 🔴 [신규] 엑셀/CSV 다운로드 핸들러
   const handleDownload = (type: 'xlsx' | 'csv') => {
     if (filteredStoreList.length === 0) {
       alert("다운로드할 데이터가 없습니다.");
       return;
     }
-
     const exportData = filteredStoreList.map((store, idx) => ({
       "순위": `${idx + 1}위`,
       "매장명": store.name,
@@ -60,7 +55,6 @@ export default function FranchiseDetailPage() {
       "일 평균": store.avg,
       "예상 정산금": store.revenue
     }));
-
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "FranchiseDetail");
@@ -80,7 +74,6 @@ export default function FranchiseDetailPage() {
     }
   };
 
-  // 검색 필터링 로직
   const filteredStoreList = storeList.filter(store => 
     store.name.toLowerCase().includes(filterKeyword.toLowerCase()) ||
     store.id.toLowerCase().includes(filterKeyword.toLowerCase())
@@ -158,7 +151,7 @@ export default function FranchiseDetailPage() {
             name: userMap[uid]?.name || "Unknown Store",
             plays: totalPlays,
             revenue: revenue,
-            avg: Math.floor(totalPlays / allDates.length)
+            avg: Math.floor(totalPlays / (allDates.length || 1))
         };
       }).sort((a, b) => b.plays - a.plays);
 
@@ -169,32 +162,34 @@ export default function FranchiseDetailPage() {
   };
 
   return (
-    <div style={{ padding: "40px", maxWidth: "1200px", margin: "0 auto", paddingBottom: "100px" }}>
-      <div style={{ marginBottom: "20px" }}>
-        <button onClick={() => router.back()} style={{ background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: "14px", marginBottom: "10px" }}>
+    <div className="page-container">
+      <div className="header-nav">
+        <button onClick={() => router.back()} className="back-btn">
           ← 전체 통계로 돌아가기
         </button>
-        <div style={filterContainerStyle}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <h2 style={{ fontSize: "24px", fontWeight: "bold", margin: 0, color: themeColor }}>{franchiseName} 상세 리포트</h2>
-                <input type="date" value={dateRange.start} onChange={(e)=>setDateRange({...dateRange, start:e.target.value})} style={inputStyle} />
-                <span style={{ color: "#888" }}>~</span>
-                <input type="date" value={dateRange.end} onChange={(e)=>setDateRange({...dateRange, end:e.target.value})} style={inputStyle} />
-                <button onClick={fetchDetailData} style={primaryBtnStyle}>조회</button>
+        <div className="filter-section">
+            <div className="filter-row">
+                <h2 className="page-title" style={{ color: themeColor }}>{franchiseName} 상세 리포트</h2>
+                <div className="date-controls">
+                    <input type="date" value={dateRange.start} onChange={(e)=>setDateRange({...dateRange, start:e.target.value})} className="input-field" />
+                    <span className="sep">~</span>
+                    <input type="date" value={dateRange.end} onChange={(e)=>setDateRange({...dateRange, end:e.target.value})} className="input-field" />
+                    <button onClick={fetchDetailData} className="primary-btn">조회</button>
+                </div>
             </div>
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "20px", marginBottom: "30px" }}>
+      <div className="stats-grid">
         <StatCard label="총 정산 금액" value={summary.totalRevenue} unit="원" color={themeColor} isHighlight={true} />
         <StatCard label="총 유효 재생" value={summary.totalPlays} unit="곡" color="#3b82f6" />
         <StatCard label="활성 매장 수" value={summary.activeStores} unit="개" />
       </div>
 
-      <div style={sectionBoxStyle}>
-        <h3 style={{ fontSize: "16px", fontWeight: "bold", marginBottom: "20px" }}>📈 {franchiseName} 전체 일별 추이</h3>
-        <div style={{ width: "100%", height: "300px" }}>
-          <ResponsiveContainer>
+      <div className="section-box">
+        <h3 className="section-title">📈 {franchiseName} 전체 일별 추이</h3>
+        <div className="chart-wrapper">
+          <ResponsiveContainer width="100%" height="100%">
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
               <XAxis dataKey="name" tickLine={false} axisLine={false} tick={{fontSize: 12, fill: '#888'}} dy={10} />
@@ -207,88 +202,132 @@ export default function FranchiseDetailPage() {
         </div>
       </div>
 
-      <div style={sectionBoxStyle}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
-            <h3 style={{ fontSize: "16px", fontWeight: "bold" }}>🏆 매장별 성과 (재생 순위)</h3>
-            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                {/* 🔴 다운로드 버튼 그룹 */}
-                <div style={downloadButtonGroupStyle}>
-                  <button onClick={() => handleDownload('xlsx')} style={downloadBtnStyle}>Excel</button>
-                  <button onClick={() => handleDownload('csv')} style={{ ...downloadBtnStyle, borderLeft: "1px solid #ddd" }}>CSV</button>
+      <div className="section-box">
+        <div className="section-header">
+            <h3 className="section-title">🏆 매장별 성과 (재생 순위)</h3>
+            <div className="controls-row">
+                <div className="download-group">
+                  <button onClick={() => handleDownload('xlsx')}>Excel</button>
+                  <button onClick={() => handleDownload('csv')}>CSV</button>
                 </div>
-                {/* 🔴 매장 검색창 */}
-                <div style={{ display: "flex", gap: "5px" }}>
+                <div className="search-group">
                     <input 
-                        type="text" 
-                        placeholder="매장명 또는 ID 검색..." 
-                        value={searchTerm}
+                        type="text" placeholder="매장명 또는 ID 검색..." value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') setFilterKeyword(searchTerm); }}
-                        style={searchInputStyle}
+                        className="input-field"
                     />
-                    <button onClick={() => setFilterKeyword(searchTerm)} style={primaryBtnStyle}>검색</button>
+                    <button onClick={() => setFilterKeyword(searchTerm)} className="primary-btn">검색</button>
                 </div>
             </div>
         </div>
 
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
-          <thead>
-            <tr style={{ borderBottom: "2px solid #eee", color: "#666", background: "#f9fafb" }}>
-              <th style={thStyle}>순위</th>
-              <th style={thStyle}>매장명 (ID)</th>
-              <th style={thStyle}>기간 내 총 재생</th>
-              <th style={thStyle}>일 평균</th>
-              <th style={thStyle}>예상 정산금</th>
-              <th style={thStyle}>관리</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredStoreList.length > 0 ? (
-                filteredStoreList.map((store, idx) => (
-                <tr key={idx} style={{ borderBottom: "1px solid #eee", height: "50px", transition: "background 0.2s" }} onMouseOver={(e) => e.currentTarget.style.background = "#f5f5f5"} onMouseOut={(e) => e.currentTarget.style.background = "transparent"}>
-                    <td style={{ ...tdStyle, width: "60px", textAlign: "center" }}>
-                        {idx < 3 ? <span style={{ fontWeight: "bold", color: themeColor }}>{idx + 1}위</span> : idx + 1}
-                    </td>
-                    <td style={tdStyle}>
-                        <div style={{ fontWeight: "bold", color: "#333" }}>{store.name}</div>
-                        <div style={{ fontSize: "11px", color: "#999" }}>{store.id}</div>
-                    </td>
-                    <td style={{ ...tdStyle, fontWeight: "600" }}>{store.plays.toLocaleString()} 곡</td>
-                    <td style={tdStyle}>{store.avg.toLocaleString()} 곡</td>
-                    <td style={{ ...tdStyle, fontWeight: "bold", color: themeColor }}>{store.revenue.toLocaleString()} 원</td>
-                    <td style={tdStyle}>
-                        <button onClick={() => router.push(`/admin/dashboard/${store.firebaseUid || store.id}`)} style={detailBtnStyle}>상세보기</button>
-                    </td>
-                </tr>
-                ))
-            ) : (
-                <tr><td colSpan={6} style={{ padding: "40px", textAlign: "center", color: "#999" }}>데이터가 없습니다.</td></tr>
-            )}
-          </tbody>
-        </table>
+        <div className="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>순위</th>
+                <th>매장명 (ID)</th>
+                <th>기간 내 총 재생</th>
+                <th>일 평균</th>
+                <th>예상 정산금</th>
+                <th>관리</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredStoreList.length > 0 ? (
+                  filteredStoreList.map((store, idx) => (
+                  <tr key={idx}>
+                      <td className="rank-td">
+                          {idx < 3 ? <span className="top-rank" style={{ background: `${themeColor}15`, color: themeColor }}>{idx + 1}위</span> : idx + 1}
+                      </td>
+                      <td className="store-td">
+                          <div className="store-name">{store.name}</div>
+                          <div className="store-id">{store.id}</div>
+                      </td>
+                      <td className="bold-text">{store.plays.toLocaleString()} 곡</td>
+                      <td>{store.avg.toLocaleString()} 곡</td>
+                      <td className="bold-text" style={{ color: themeColor }}>{store.revenue.toLocaleString()} 원</td>
+                      <td>
+                          <button onClick={() => router.push(`/admin/dashboard/${store.firebaseUid || store.id}`)} className="detail-btn">상세보기</button>
+                      </td>
+                  </tr>
+                  ))
+              ) : (
+                  <tr><td colSpan={6} className="no-data">데이터가 없습니다.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
+
+      <style jsx>{`
+        .page-container { padding: 20px; max-width: 1200px; margin: 0 auto; }
+        .back-btn { background: none; border: none; color: #6b7280; cursor: pointer; font-size: 14px; margin-bottom: 12px; transition: color 0.2s; }
+        .back-btn:hover { color: #1f2937; }
+        
+        .filter-section { background: white; padding: 20px; border-radius: 12px; border: 1px solid #eee; margin-bottom: 24px; }
+        .filter-row { display: flex; justify-content: space-between; align-items: center; gap: 20px; flex-wrap: wrap; }
+        .page-title { font-size: 22px; font-weight: bold; margin: 0; }
+        .date-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .section-box { background: white; padding: 25px; border-radius: 12px; border: 1px solid #eee; margin-bottom: 24px; }
+        .section-title { font-size: 16px; font-weight: bold; margin-bottom: 20px; color: #1f2937; }
+        .chart-wrapper { width: 100%; height: 300px; }
+        
+        .section-header { display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+        .controls-row { display: flex; gap: 12px; flex-wrap: wrap; }
+        
+        .table-responsive { width: 100%; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 700px; }
+        th { padding: 12px; text-align: left; background: #f9fafb; border-bottom: 2px solid #eee; color: #4b5563; font-size: 13px; font-weight: 600; }
+        td { padding: 14px 12px; border-bottom: 1px solid #eee; font-size: 14px; color: #374151; }
+        
+        .rank-td { width: 80px; text-align: center; }
+        .top-rank { padding: 4px 10px; border-radius: 20px; font-weight: bold; font-size: 12px; }
+        .store-name { font-weight: bold; color: #111827; }
+        .store-id { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+        .bold-text { font-weight: 600; }
+        .no-data { padding: 60px; text-align: center; color: #9ca3af; }
+        
+        .input-field { border: 1px solid #ddd; border-radius: 6px; padding: 8px 12px; font-size: 14px; outline: none; }
+        .primary-btn { background: #1f2937; color: white; border: none; padding: 8px 18px; border-radius: 6px; cursor: pointer; font-weight: bold; transition: opacity 0.2s; }
+        .primary-btn:hover { opacity: 0.9; }
+        .detail-btn { padding: 6px 12px; border-radius: 6px; border: 1px solid #ddd; background: white; cursor: pointer; font-size: 12px; font-weight: 600; color: #4b5563; }
+        
+        .download-group { display: flex; border: 1px solid #ddd; border-radius: 6px; overflow: hidden; }
+        .download-group button { background: white; border: none; padding: 8px 14px; font-size: 13px; cursor: pointer; border-right: 1px solid #ddd; font-weight: 500; }
+        .download-group button:hover { background: #f9fafb; }
+        .download-group button:last-child { border-right: none; }
+
+        @media (max-width: 768px) {
+          .filter-row, .section-header { flex-direction: column; align-items: flex-start; }
+          .date-controls, .controls-row { width: 100%; }
+          .date-controls input { flex: 1; }
+          .stats-grid { grid-template-columns: 1fr; }
+        }
+      `}</style>
     </div>
   );
 }
 
-// UI 컴포넌트 & 스타일 (기존 스타일 유지 및 추가)
 function StatCard({ label, value, unit, color = "#333", isHighlight = false, subText }: any) {
   return (
-    <div style={{ background: "white", padding: "24px", borderRadius: "12px", boxShadow: isHighlight ? `0 4px 12px ${color}20` : "0 1px 3px rgba(0,0,0,0.05)", border: "1px solid #eee", borderTop: isHighlight ? `4px solid ${color}` : "1px solid #eee" }}>
-      <div style={{ color: "#6b7280", fontSize: "14px", marginBottom: "5px" }}>{label}</div>
-      <div style={{ fontSize: "28px", fontWeight: "bold", color: color, marginBottom: "5px" }}>{value.toLocaleString()} <span style={{ fontSize: "14px", color: "#888", fontWeight: "normal" }}>{unit}</span></div>
-      {subText && <div style={{ fontSize: "12px", color: "#888" }}>{subText}</div>}
+    <div className={`stat-card ${isHighlight ? 'highlight' : ''}`}>
+      <div className="label">{label}</div>
+      <div className="value" style={{ color }}>
+        {value.toLocaleString()} <span className="unit">{unit}</span>
+      </div>
+      {subText && <div className="subtext">{subText}</div>}
+      <style jsx>{`
+        .stat-card { background: white; padding: 24px; border-radius: 12px; border: 1px solid #eee; transition: transform 0.2s; }
+        .stat-card.highlight { border-top: 4px solid ${color}; box-shadow: 0 4px 12px ${color}15; }
+        .label { color: #6b7280; font-size: 14px; margin-bottom: 8px; }
+        .value { font-size: 28px; font-weight: bold; }
+        .unit { font-size: 16px; color: #9ca3af; font-weight: normal; }
+        .subtext { font-size: 12px; color: #9ca3af; margin-top: 4px; }
+      `}</style>
     </div>
   );
 }
-
-const filterContainerStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", background: "white", padding: "15px 20px", borderRadius: "12px", border: "1px solid #eee" };
-const sectionBoxStyle = { background: "white", padding: "25px", borderRadius: "12px", border: "1px solid #eee", marginBottom: "20px" };
-const inputStyle = { border: "1px solid #ddd", borderRadius: "6px", padding: "8px 10px", fontSize: "14px", outline: "none" };
-const searchInputStyle = { padding: "8px 12px", border: "1px solid #ddd", borderRadius: "6px", fontSize: "14px", width: "180px", outline: "none" };
-const primaryBtnStyle = { background: "#1f2937", color: "white", border: "none", padding: "8px 16px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" };
-const thStyle = { padding: "12px", textAlign: "left" as const, fontWeight: "600" };
-const tdStyle = { padding: "12px", color: "#333" };
-const downloadButtonGroupStyle = { display: "flex", border: "1px solid #ddd", borderRadius: "6px", overflow: "hidden" };
-const downloadBtnStyle = { background: "#f9fafb", color: "#374151", border: "none", padding: "8px 12px", fontSize: "13px", cursor: "pointer", fontWeight: "500" };
-const detailBtnStyle = { padding: "6px 12px", borderRadius: "6px", border: "1px solid #ddd", background: "white", cursor: "pointer", fontSize: "12px" };

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { useState } from "react";
+import { useState, useEffect} from "react";
 import { useRouter } from "next/navigation";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -11,9 +11,29 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const { logout } = useAuth();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
+  useEffect(() => {
+    setMounted(true); // 컴포넌트가 브라우저에서 실행되면 true로 변경
+  }, []);
+
+  // ✅ 2. 마운트 되기 전(로딩 중)에는 로딩 화면 출력 (못생긴 리스트 숨김)
+  if (!mounted) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh', 
+        backgroundColor: '#1f2937', // 배경색을 헤더와 맞춤
+        color: 'white' 
+      }}>
+        Loading...
+      </div>
+    );
+  }
   const isLoginPage = pathname === "/admin/login";
-
+  
   if (isLoginPage) {
     return (
       <div style={{ minHeight: "100vh", backgroundColor: "#111827" }}>
@@ -21,7 +41,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </div>
     );
   }
-
+  
   const menuItems = [
     { name: "매장 통계", href: "/admin/dashboard", icon: "📊" },
     { name: "데이터 검증", href: "/admin/validator", icon: "🚨" },
@@ -31,26 +51,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div className="admin-container">
-      {/* ⬛️ 사이드바 (고정됨) */}
-      <aside className="admin-sidebar">
-        
+      <aside className={`admin-sidebar ${mobileMenuOpen ? "mobile-open" : ""}`}>
         <div className="sidebar-header">
-          <h1 
-            className="logo-text"
-            onClick={() => router.push('/admin/dashboard')}
-            style={{ cursor: 'pointer' }}
-          >
-            ODO Admin
+          <h1 className="logo-text" onClick={() => {
+              router.push('/admin/dashboard');
+              setMobileMenuOpen(false);
+            }}style={{ cursor: 'pointer' }}>ODO Admin
           </h1>
           <button 
             className="mobile-toggle"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
-            ☰
+            {mobileMenuOpen ? "✕" : "☰"}
           </button>
         </div>
 
-        <nav className={`sidebar-nav ${mobileMenuOpen ? "open" : ""}`}>
+        <nav className="sidebar-nav">
           <ul>
             {menuItems.map((item) => {
               const isActive = pathname === item.href;
@@ -70,17 +86,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </ul>
         </nav>
 
-        {/* 底部 하단 영역: 메인 복귀 + 로그아웃 */}
         <div className="sidebar-footer">
-          {/* 🏠 서비스 메인으로 돌아가는 버튼 */}
           <button 
             onClick={() => router.push('/')} 
             className="exit-btn"
-            title="사용자 사이트로 이동"
           >
-            <span style={{ fontSize: '14px' }}></span> 서비스 메인으로
+            서비스 메인으로
           </button>
-
           <div className="logout-area">
             <button onClick={logout} className="logout-btn">
               로그아웃
@@ -88,161 +100,148 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
         </div>
       </aside>
-
+       
       {/* ⬜️ 메인 콘텐츠 */}
       <main className="admin-content">
-        {children}
+        <div className="mobile-top-bar">
+          <button className="mobile-toggle-btn" onClick={() => setMobileMenuOpen(true)}>☰</button>
+          <span style={{ fontWeight: 'bold' }}>ODO Admin</span>
+          <div style={{ width: 24 }}></div>
+        </div>
+        <div className="content-inner">
+          {children}
+        </div>
       </main>
 
       <style jsx>{`
-        .admin-container {
-          display: flex;
-          min-height: 100vh;
-          background-color: #f9fafb; /* 본문 배경을 살짝 밝은 회색으로 주면 더 고급짐 */
-        }
+      
+  .admin-container {
+  display: flex;
+  min-height: 100vh;
+  /* 아이폰 하단 홈 바 영역만큼 패딩 추가 */
+  padding-bottom: env(safe-area-inset-bottom);
+  background-color: #f9fafb;
+}
 
-        .admin-sidebar {
-          width: 260px;
-          background-color: #1f2937;
-          color: white;
-          display: flex;
-          flex-direction: column;
-          
-          /* ✅ 사이드바 고정 핵심 로직 */
-          position: fixed; 
-          top: 0;
-          left: 0;
-          bottom: 0;
-          z-index: 100;
-        }
+.admin-sidebar {
+  width: 260px;
+  background-color: #1f2937;
+  color: white;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 2000;
+  
+  /* ✅ 아이폰 상단 노치 대응 */
+  padding-top: env(safe-area-inset-top);
+  /* ✅ 아이폰 하단 홈바 대응 */
+  padding-bottom: env(safe-area-inset-bottom);
+  
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.3s ease;
+}
 
-        .sidebar-header {
-          padding: 24px;
-          border-bottom: 1px solid #374151;
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        }
+  .sidebar-header {
+    padding: 24px;
+    border-bottom: 1px solid #374151;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
 
-        .logo-text {
-          font-size: 20px;
-          font-weight: bold;
-          margin: 0;
-          color: #f3f4f6;
-        }
+  .logo-text { font-size: 20px; font-weight: bold; margin: 0; color: #f3f4f6; }
+  .sidebar-nav { flex: 1; padding: 20px 10px; overflow-y: auto; }
+  .sidebar-nav ul { list-style: none; padding: 0; margin: 0; }
 
-        .sidebar-nav {
-          flex: 1;
-          padding: 20px 10px;
-          overflow-y: auto;
-        }
+  .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 16px; /* 모바일 터치를 위해 높이 증가 */
+    border-radius: 8px;
+    font-size: 15px;
+    color: #9ca3af;
+    text-decoration: none;
+    transition: all 0.2s;
+  }
 
-        .sidebar-nav ul {
-          list-style: none;
-          padding: 0;
-          margin: 0;
-        }
+  .nav-link.active { color: #60a5fa; background-color: rgba(59, 130, 246, 0.1); font-weight: bold; }
 
-        .nav-link {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          padding: 12px 16px;
-          border-radius: 8px;
-          font-size: 15px;
-          color: #9ca3af;
-          text-decoration: none;
-          transition: all 0.2s;
-        }
+  .sidebar-footer { padding: 20px; border-top: 1px solid #374151; display: flex; flex-direction: column; gap: 10px; }
+  .exit-btn { width: 100%; padding: 12px; background-color: #374151; border: 1px solid #4b5563; border-radius: 8px; color: white; cursor: pointer; }
+  .logout-btn { width: 100%; padding: 10px; background: transparent; border: none; color: #9ca3af; cursor: pointer; text-decoration: underline; }
 
-        .nav-link:hover {
-          color: white;
-          background-color: rgba(255, 255, 255, 0.05);
-        }
+  .admin-content {
+  flex: 1;
+  margin-left: 260px;
+  min-height: 100vh;
+  background-color: #f9fafb;
+  /* ✅ 하단 바에 가려지지 않게 여백 추가 */
+  padding-bottom: env(safe-area-inset-bottom);
+}
+  .content-inner { padding: 24px; flex: 1; }
+  .mobile-top-bar { display: none; }
 
-        .nav-link.active {
-          color: #60a5fa;
-          background-color: rgba(59, 130, 246, 0.1);
-          font-weight: bold;
-        }
+  /* 📱 모바일 최적화 핵심 스타일 */
+  @media (max-width: 768px) {
 
-        /* ✅ 하단 버튼 영역 스타일 */
-        .sidebar-footer {
-          padding: 16px;
-          border-top: 1px solid #374151;
-          display: flex;
-          flex-direction: column;
-          gap: 10px;
-        }
+    .admin-content {
+      margin-left: 0; /* 모바일에서는 여백 제거 */
+    }
 
-        .exit-btn {
-          width: 100%;
-          padding: 12px;
-          background-color: #374151;
-          border: 1px solid #4b5563;
-          border-radius: 8px;
-          color: #e5e7eb;
-          font-size: 13px;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          transition: all 0.2s;
-        }
+    .mobile-top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 16px;
+    /* ✅ 노치 영역만큼 높이 확보 */
+    height: calc(60px + env(safe-area-inset-top));
+    padding-top: env(safe-area-inset-top);
+    
+    background-color: #1f2937;
+    color: white;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+  }
 
-        .exit-btn:hover {
-          background-color: #4b5563;
-          border-color: #6b7280;
-          color: white;
-        }
+  .admin-sidebar {
+    width: 100%; /* 모바일에서는 가득 차게 설정하는 것이 더 깔끔할 수 있습니다 */
+    transform: ${mobileMenuOpen ? "translateX(0)" : "translateX(-100%)"};
+  }
 
-        .logout-area {
-          padding: 0;
-        }
+    .mobile-toggle-btn {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 24px;
+      cursor: pointer;
+    }
 
-        .logout-btn {
-          width: 100%;
-          padding: 10px;
-          background: transparent;
-          border: 1px solid transparent;
-          border-radius: 6px;
-          color: #9ca3af;
-          font-size: 13px;
-          cursor: pointer;
-          text-decoration: underline;
-        }
-
-        .logout-btn:hover {
-          color: #ef4444;
-        }
-
-        .admin-content {
-          flex: 1;
-          /* ✅ 사이드바 너비만큼 왼쪽 마진을 주어 가려지지 않게 함 */
-          margin-left: 260px; 
-          padding: 0;
-          min-height: 100vh;
-        }
-
-        .mobile-toggle { display: none; background: none; border: none; color: white; font-size: 24px; cursor: pointer; }
-
-        @media (max-width: 768px) {
-          .admin-sidebar {
-            width: 100%;
-            height: auto;
-            position: relative; /* 모바일에서는 다시 풀어줌 */
-          }
-          .admin-content {
-            margin-left: 0;
-            min-height: auto;
-          }
-          .mobile-toggle { display: block; }
-          .sidebar-nav { display: none; }
-          .sidebar-nav.open { display: block; }
-          .sidebar-footer { display: ${mobileMenuOpen ? 'flex' : 'none'}; }
-        }
-      `}</style>
+    /* 메뉴가 열렸을 때 배경을 어둡게 차단하는 가상 요소 (선택 사항) */
+    .admin-container::after {
+      content: "";
+      display: ${mobileMenuOpen ? "block" : "none"};
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1500;
+    }
+  }
+    @media screen and (max-width: 768px) {
+    input, select, textarea, button {
+      font-size: 16px !important; 
+    }
+  }
+      `
+      }</style>
     </div>
   );
 }
+
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"></meta>

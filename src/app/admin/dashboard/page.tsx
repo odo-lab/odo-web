@@ -42,7 +42,7 @@ export default function AdminDashboardPage() {
     fetchRealData();
   }, []);
 
-  // 검색 필터링 (매장명, ID, 예금주 통합 검색)
+  // 검색 필터링
   const filteredUserList = userList.filter(user => 
     user.storeName.toLowerCase().includes(filterKeyword.toLowerCase()) ||
     user.id.toLowerCase().includes(filterKeyword.toLowerCase()) ||
@@ -123,7 +123,7 @@ export default function AdminDashboardPage() {
     setLoadingStatus("데이터 불러오는 중...");
 
     try {
-      // 1. monitored_users에서 유저 정보(예금주 포함)를 먼저 로드
+      // 1. 유저 정보 로드
       const usersSnap = await getDocs(collection(db, "monitored_users"));
       const userMap: Record<string, any> = {};
       
@@ -131,7 +131,7 @@ export default function AdminDashboardPage() {
         const d = doc.data();
         if (d.lastfm_username) {
           userMap[d.lastfm_username] = {
-            ownerName: d.owner_name || "이름 없음", // 여기에 예금주 정보 저장
+            ownerName: d.owner_name || "이름 없음",
             store_name: d.store_name || "이름 없음", 
             franchise: d.franchise || "personal",
             uid: d.uid 
@@ -139,7 +139,7 @@ export default function AdminDashboardPage() {
         }
       });
 
-      // 2. daily_stats 로드
+      // 2. 통계 로드
       const statsColl = collection(db, "daily_stats");
       const qStats = query(
         statsColl, 
@@ -182,7 +182,6 @@ export default function AdminDashboardPage() {
         totalPlaysInPeriod += count;
       });
 
-      // 차트 데이터 가공
       const finalChartData = isDailyView 
         ? getDatesInRange(new Date(dateRange.start), new Date(dateRange.end)).map(dateStr => ({
             name: dateStr.slice(5),
@@ -193,7 +192,6 @@ export default function AdminDashboardPage() {
             plays: chartMap[month].plays
           }));
 
-      // 3. monitored_users 정보(userMap)와 play_counts를 합쳐 최종 리스트 생성
       const finalUserList = Object.keys(userPlayCounts).map(uid => {
         const p = userPlayCounts[uid] || 0;
         const info = userMap[uid] || {};
@@ -202,7 +200,7 @@ export default function AdminDashboardPage() {
             id: uid, 
             firebaseUid: info.uid || uid, 
             storeName: info.store_name || "Unknown", 
-            ownerName: info.ownerName || "이름 없음", // userMap에서 예금주 매칭
+            ownerName: info.ownerName || "이름 없음", 
             franchise: info.franchise || 'personal', 
             plays: p, 
             revenue: calculateRevenue(info.franchise || 'personal', p) 
@@ -340,35 +338,40 @@ export default function AdminDashboardPage() {
   };
 
   return (
-    <div style={{ padding: "40px", maxWidth: "1200px", margin: "0 auto", paddingBottom: "100px" }}>
+    <div className="dashboard-container">
       
-      <div style={filterContainerStyle}>
-        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          <h2 style={{color: "#444", fontSize: "18px", fontWeight: "bold", margin: 0, marginRight: "10px" }}>통계 조회</h2>
-          <input type="date" value={dateRange.start} onChange={(e)=>setDateRange({...dateRange, start:e.target.value})} style={inputStyle} />
-          <span style={{ color: "#888" }}>~</span>
-          <input type="date" value={dateRange.end} onChange={(e)=>setDateRange({...dateRange, end:e.target.value})} style={inputStyle} />
-          <button onClick={() => fetchRealData(true)} style={primaryBtnStyle}>조회</button>
+      {/* 🟢 1. 필터 섹션 */}
+      <div className="section-box filter-bar">
+        <div className="filter-group">
+          <h2 className="section-title">통계 조회</h2>
+          <div className="date-inputs">
+            <input type="date" value={dateRange.start} onChange={(e)=>setDateRange({...dateRange, start:e.target.value})} className="common-input" />
+            <span style={{ color: "#888" }}>~</span>
+            <input type="date" value={dateRange.end} onChange={(e)=>setDateRange({...dateRange, end:e.target.value})} className="common-input" />
+          </div>
+          <button onClick={() => fetchRealData(true)} className="primary-btn">조회</button>
         </div>
 
-        <button onClick={syncMissingData} disabled={syncing || loading} style={syncBtnStyle(syncing)}>
+        <button onClick={syncMissingData} disabled={syncing || loading} className={`sync-btn ${syncing ? 'disabled' : ''}`}>
             {syncing ? "🔄 작업 중..." : "🔴 데이터 동기화"}
         </button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "20px", marginBottom: "30px" }}>
+      {/* 🟢 2. 통계 카드 섹션 */}
+      <div className="stats-grid">
         <StatCard label="총 사용자" value={stats.users} subText="전체 가입 매장" unit="명" loading={loading} />
         <StatCard label="조회 기간 재생" value={stats.plays} subText="유효 재생 합계" unit="곡" loading={loading} color="#3b82f6" />
         <StatCard label="조회 기간 정산" value={stats.revenue} subText="예상 정산금 합계" unit="원" loading={loading} color="#10b981" />
       </div>
 
       {(loading || syncing) && loadingStatus && (
-        <div style={loadingStatusStyle}>⏳ {loadingStatus}</div>
+        <div className="loading-status">⏳ {loadingStatus}</div>
       )}
 
-      <div style={sectionBoxStyle}>
-        <h3 style={{ color: "#444",fontSize: "16px", fontWeight: "bold", marginBottom: "20px" }}>📈 전체 재생 추이</h3>
-        <div style={{ width: "100%", height: "300px" }}>
+      {/* 🟢 3. 차트 섹션 */}
+      <div className="section-box chart-section">
+        <h3>📈 전체 재생 추이</h3>
+        <div className="chart-wrapper">
           <ResponsiveContainer>
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eee" />
@@ -382,76 +385,241 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      <div style={sectionBoxStyle}>
-        <div style={{ color: "#444",display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "15px" }}>
-            <h3 style={{ fontSize: "16px", fontWeight: "bold" }}>사용자별 현황</h3>
-            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                <div style={downloadButtonGroupStyle}>
-                  <button onClick={() => handleDownload('xlsx')} style={downloadBtnStyle}>Excel</button>
-                  <button onClick={() => handleDownload('csv')} style={{ ...downloadBtnStyle, borderLeft: "1px solid #ddd" }}>CSV</button>
-                </div>
-                <div style={{ display: "flex", gap: "5px" }}>
-                    <input type="text" placeholder="매장명, ID, 예금주 검색..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }} style={searchInputStyle} />
-                    <button onClick={handleSearch} style={primaryBtnStyle}>검색</button>
-                </div>
-            </div>
+      {/* 🟢 4. 사용자별 현황 (테이블) */}
+      <div className="section-box">
+        <div className="table-header">
+           <h3>사용자별 현황</h3>
+           <div className="table-actions">
+               <div className="download-group">
+                 <button onClick={() => handleDownload('xlsx')} className="download-btn">Excel</button>
+                 <button onClick={() => handleDownload('csv')} className="download-btn">CSV</button>
+               </div>
+               <div className="search-group">
+                   <input type="text" placeholder="매장/ID/예금주 검색" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }} className="search-input" />
+                   <button onClick={handleSearch} className="primary-btn">검색</button>
+               </div>
+           </div>
         </div>
 
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
-          <thead>
-            <tr style={{ borderBottom: "1px solid #eee", color: "#666" }}>
-              <th style={thStyle}>매장명 (ID) / 예금주 / 유형</th>
-              <th style={thStyle}>유효 재생수</th>
-              <th style={thStyle}>예상 정산금</th>
-              <th style={thStyle}>상세보기</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredUserList.length > 0 ? (
-              filteredUserList.map((user, idx) => (
-                <tr key={idx} style={{ borderBottom: "1px solid #f9fafb" }}>
-                  <td style={tdStyle}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        <div style={{ fontWeight: "bold", color: "#333" }}>{user.storeName}</div>
-                        {/* 매장명 옆에 파란색 글씨로 예금주 표시 */}
-                        <div style={{ fontSize: "12px", color: "#3b82f6", fontWeight: "500" }}>({user.ownerName})</div>
-                    </div>
-                    <div style={{ fontSize: "12px", color: "#999" }}>{user.id}</div>
-                    <span style={badgeStyle(user.franchise)}>
-                      {user.franchise === 'seveneleven' ? '세븐일레븐' : '개인/기타'}
-                    </span>
-                  </td>
-                  <td style={tdStyle}>{user.plays.toLocaleString()} 곡</td>
-                  <td style={{ ...tdStyle, color: "#10b981", fontWeight: "bold" }}>{user.revenue.toLocaleString()} 원</td>
-                  <td style={tdStyle}>
-                    <button onClick={() => router.push(`/admin/dashboard/${user.firebaseUid || user.id}`)} style={detailBtnStyle}>상세보기</button>
-                  </td>
-                </tr>
-              ))
-            ) : (
-               <tr><td colSpan={4} style={{ padding: "30px", textAlign: "center", color: "#999" }}>데이터가 없습니다.</td></tr>
-            )}
-          </tbody>
-        </table>
+        {/* ✅ 모바일에서 테이블이 넘치면 스크롤되도록 감싸줌 */}
+        <div className="table-responsive">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>매장명 (ID) / 예금주 / 유형</th>
+                <th>유효 재생수</th>
+                <th>예상 정산금</th>
+                <th>상세보기</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredUserList.length > 0 ? (
+                filteredUserList.map((user, idx) => (
+                  <tr key={idx}>
+                    <td>
+                      <div className="store-info">
+                          <div className="store-name-row">
+                             <span className="store-name">{user.storeName}</span>
+                             <span className="owner-name">({user.ownerName})</span>
+                          </div>
+                          <div className="user-id">{user.id}</div>
+                          <span className={`badge ${user.franchise === 'seveneleven' ? 'badge-seven' : 'badge-personal'}`}>
+                            {user.franchise === 'seveneleven' ? '세븐일레븐' : '개인/기타'}
+                          </span>
+                      </div>
+                    </td>
+                    <td>{user.plays.toLocaleString()} 곡</td>
+                    <td className="revenue-text">{user.revenue.toLocaleString()} 원</td>
+                    <td>
+                      <button onClick={() => router.push(`/admin/dashboard/${user.firebaseUid || user.id}`)} className="detail-btn">상세보기</button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                 <tr><td colSpan={4} className="empty-msg">데이터가 없습니다.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
+
+      {/* 🎨 CSS-in-JS for Responsiveness */}
+      <style jsx>{`
+        .dashboard-container {
+          padding: 40px;
+          max-width: 1200px;
+          margin: 0 auto;
+          padding-bottom: 100px;
+          color: #111827;
+        }
+
+        .section-box {
+          background: white;
+          padding: 25px;
+          border-radius: 12px;
+          border: 1px solid #eee;
+          margin-bottom: 20px;
+        }
+
+        .filter-bar {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 20px;
+          flex-wrap: wrap;
+        }
+
+        .filter-group {
+          display: flex;
+          align-items: center;
+          gap: 15px;
+          flex-wrap: wrap;
+        }
+
+        .section-title {
+          font-size: 18px;
+          font-weight: bold;
+          margin: 0;
+          color: #111827;
+        }
+
+        .date-inputs {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .common-input {
+          border: 1px solid #ddd;
+          border-radius: 6px;
+          padding: 8px 10px;
+          font-size: 14px;
+          outline: none;
+        }
+
+        .primary-btn {
+          background: #1f2937;
+          color: white;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-weight: bold;
+          white-space: nowrap;
+        }
+
+        .sync-btn {
+          background: #ef4444;
+          color: white;
+          border: none;
+          padding: 8px 16px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-weight: bold;
+          font-size: 14px;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          white-space: nowrap;
+        }
+        .sync-btn.disabled { background: #fca5a5; cursor: not-allowed; }
+
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 20px;
+          margin-bottom: 30px;
+        }
+
+        .loading-status {
+          text-align: center;
+          padding: 20px;
+          background: #f0f9ff;
+          color: #0369a1;
+          border-radius: 8px;
+          margin-bottom: 20px;
+        }
+
+        .chart-section h3 { font-size: 16px; font-weight: bold; margin-bottom: 20px; }
+        .chart-wrapper { width: 100%; height: 300px; }
+
+        /* 테이블 관련 */
+        .table-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 15px;
+          flex-wrap: wrap;
+          gap: 15px;
+        }
+        .table-header h3 { font-size: 16px; font-weight: bold; margin: 0; }
+
+        .table-actions {
+          display: flex;
+          gap: 10px;
+          align-items: center;
+          flex-wrap: wrap;
+        }
+
+        .download-group {
+          display: flex;
+          border: 1px solid #ddd;
+          border-radius: 6px;
+          overflow: hidden;
+        }
+        .download-btn {
+          background: #f9fafb; color: #374151; border: none;
+          padding: 8px 12px; font-size: 13px; cursor: pointer; font-weight: 500;
+        }
+        .download-btn:first-child { border-right: 1px solid #ddd; }
+
+        .search-group { display: flex; gap: 5px; }
+        .search-input {
+          padding: 8px 12px; border: 1px solid #ddd; border-radius: 6px;
+          font-size: 14px; width: 200px; outline: none;
+        }
+
+        .table-responsive { overflow-x: auto; }
+        .data-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 600px; }
+        .data-table th { padding: 12px; text-align: left; font-weight: normal; border-bottom: 1px solid #eee; color: #666; }
+        .data-table td { padding: 12px; color: #333; border-bottom: 1px solid #f9fafb; }
+        
+        .store-info { display: flex; flex-direction: column; gap: 2px; }
+        .store-name-row { display: flex; align-items: center; gap: 6px; }
+        .store-name { font-weight: bold; color: #333; }
+        .owner-name { font-size: 12px; color: #3b82f6; font-weight: 500; }
+        .user-id { font-size: 12px; color: #999; }
+        
+        .badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; color: white; margin-top: 4px; display: inline-block; width: fit-content; }
+        .badge-seven { background: #008060; }
+        .badge-personal { background: #6366f1; }
+        
+        .revenue-text { color: #10b981; font-weight: bold; }
+        .detail-btn { background: #1f2937; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+        .empty-msg { padding: 30px; text-align: center; color: #999; }
+
+        /* 📱 Mobile Responsiveness */
+        @media (max-width: 768px) {
+          .dashboard-container { padding: 20px; padding-bottom: 80px; }
+          
+          .filter-bar { flex-direction: column; align-items: stretch; gap: 15px; }
+          .filter-group { flex-direction: column; align-items: flex-start; width: 100%; }
+          .date-inputs { width: 100%; }
+          .common-input { flex: 1; }
+          .sync-btn { width: 100%; justify-content: center; }
+
+          .stats-grid { grid-template-columns: 1fr; gap: 15px; }
+          
+          .table-header { flex-direction: column; align-items: flex-start; }
+          .table-actions { width: 100%; flex-direction: column; align-items: stretch; }
+          .search-group { width: 100%; }
+          .search-input { width: 100%; flex: 1; }
+          .download-group { justify-content: center; }
+        }
+      `}</style>
     </div>
   );
 }
-
-// 스타일 정의 (생략 - 이전과 동일)
-const filterContainerStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", background: "white", padding: "15px 20px", borderRadius: "12px", border: "1px solid #eee" };
-const sectionBoxStyle = { background: "white", padding: "25px", borderRadius: "12px", border: "1px solid #eee", marginBottom: "20px" };
-const inputStyle = { border: "1px solid #ddd", borderRadius: "6px", padding: "8px 10px", fontSize: "14px", outline: "none" };
-const searchInputStyle = { padding: "8px 12px", border: "1px solid #ddd", borderRadius: "6px", fontSize: "14px", width: "200px", outline: "none" };
-const primaryBtnStyle = { background: "#1f2937", color: "white", border: "none", padding: "8px 16px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold" };
-const syncBtnStyle = (syncing: boolean) => ({ background: syncing ? "#fca5a5" : "#ef4444", color: "white", border: "none", padding: "8px 16px", borderRadius: "6px", cursor: syncing ? "not-allowed" : "pointer", fontWeight: "bold", fontSize: "14px", display: "flex", alignItems: "center", gap: "6px" });
-const downloadButtonGroupStyle = { display: "flex", border: "1px solid #ddd", borderRadius: "6px", overflow: "hidden" };
-const downloadBtnStyle = { background: "#f9fafb", color: "#374151", border: "none", padding: "8px 12px", fontSize: "13px", cursor: "pointer", fontWeight: "500" };
-const thStyle = { padding: "12px", textAlign: "left" as const, fontWeight: "normal" };
-const tdStyle = { padding: "12px", color: "#333" };
-const badgeStyle = (f: string) => ({ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", background: f === 'seveneleven' ? "#008060" : "#6366f1", color: "white", marginTop: "4px", display: "inline-block" });
-const detailBtnStyle = { background: "#1f2937", color: "white", border: "none", padding: "6px 12px", borderRadius: "6px", cursor: "pointer", fontSize: "12px" };
-const loadingStatusStyle = { textAlign: "center" as const, padding: "20px", background: "#f0f9ff", color: "#0369a1", borderRadius: "8px", marginBottom: "20px" };
 
 function StatCard({ label, value, subText, unit, loading, color = "#333" }: any) {
   return (

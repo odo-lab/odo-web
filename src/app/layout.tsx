@@ -1,8 +1,14 @@
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
-// 👇 기존 UI 컴포넌트 import는 다 지우고, 이거 하나만 부릅니다.
 import ClientLayout from "@/components/ClientLayout"; 
-
+import type { Viewport } from "next";
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false, // 👈 핀치 줌(손가락 확대) 방지
+  themeColor: "#1f2937", // 👈 아이폰 상단 상태바 색상 (아까 배경색과 통일)
+};
 export const metadata = {
   title: "ODO - 매장용 플레이리스트",
   description: "점주 운영형 플레이리스트 선택 콘솔 (Prototype)",

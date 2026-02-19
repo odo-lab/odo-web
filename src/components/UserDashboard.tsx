@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -14,14 +13,17 @@ interface UserDashboardProps {
 
 export default function UserDashboard({ targetId, isAdmin = false }: UserDashboardProps) {
   const router = useRouter();
-  const [loading, setLoading] = useState(true); // 초기 상태를 true로 설정
+  const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [storeInfo, setStoreInfo] = useState<any>(null);
   
+  // ✅ 성장률(growthRate) 상태 추가
   const [stats, setStats] = useState({ 
     playCount: 0, 
     revenue: 0, 
-    achievementRate: 0 
+    achievementRate: 0,
+    growthRate: 0 ,
+    hasPrevData: true
   });
   
   const [chartData, setChartData] = useState<any[]>([]);
@@ -83,7 +85,6 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
           await fetchDashboardData(realLastfmId, dateRange.start, dateRange.end, storeData.franchise);
         } else {
           setStoreInfo(null);
-          // 🚨 [수정 포인트] 정보가 없는데 어드민이면 리다이렉트
           if (isAdmin) {
             alert("해당 매장 정보를 찾을 수 없어 대시보드로 이동합니다.");
             router.push("/admin/dashboard");
@@ -117,13 +118,41 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
     setLoading(true);
     try {
         const statsColl = collection(db, "daily_stats");
-        const qStats = query(statsColl, where("date", ">=", startStr), where("date", "<=", endStr));
-        const statsSnap = await getDocs(qStats);
         
+        // 1. 현재 기간 데이터 조회
+        const qStats = query(statsColl, where("date", ">=", startStr), where("date", "<=", endStr));
+        
+        // 2. 전월 동기간 데이터 조회 (비교용)
+        const prevStart = new Date(startStr);
+        prevStart.setMonth(prevStart.getMonth() - 1);
+        const prevEnd = new Date(endStr);
+        prevEnd.setMonth(prevEnd.getMonth() - 1);
+        const prevStartStr = formatYMD(prevStart);
+        const prevEndStr = formatYMD(prevEnd);
+
+        const qPrevStats = query(statsColl, where("date", ">=", prevStartStr), where("date", "<=", prevEndStr));
+
+        // 병렬로 데이터 가져오기
+        const [statsSnap, prevStatsSnap] = await Promise.all([
+            getDocs(qStats),
+            getDocs(qPrevStats)
+        ]);
+        
+        // 현재 기간 집계
         const myStats: any[] = [];
         statsSnap.forEach(doc => {
             const d = doc.data();
             if (d.lastfm_username === lastfmId || d.userId === lastfmId) myStats.push(d);
+        });
+
+        // 전월 기간 집계
+        let prevTotalCount = 0;
+        prevStatsSnap.forEach(doc => {
+            const d = doc.data();
+            if (d.lastfm_username === lastfmId || d.userId === lastfmId) {
+                const count = d.play_count !== undefined ? d.play_count : (d.playCount || 0);
+                prevTotalCount += count;
+            }
         });
 
         const requiredDates = getDatesInRange(new Date(startStr), new Date(endStr));
@@ -145,7 +174,35 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
         const estimatedRevenue = calculateRevenue(franchise || 'personal', totalCount);
         const achievementRate = Math.min((totalCount / 7500) * 100, 100);
 
-        setStats({ playCount: totalCount, revenue: estimatedRevenue, achievementRate: achievementRate });
+        // ✅ 성장률 계산 로직
+        let growthRate = 0;
+        let hasPrevData = false; // 기본적으로 없다고 가정
+
+        if (prevTotalCount > 0) {
+          // 전월 데이터가 있을 때만 계산
+          growthRate = ((totalCount - prevTotalCount) / prevTotalCount) * 100;
+          hasPrevData = true; 
+        } else {
+          // 전월 데이터가 0인 경우 (비교 불가)
+          growthRate = 0;
+          hasPrevData = false;
+        }
+
+        setStats({ 
+          playCount: totalCount, 
+          revenue: estimatedRevenue, 
+          achievementRate: achievementRate,
+          growthRate: growthRate,
+          hasPrevData: hasPrevData // ✅ 상태 업데이트에 포함
+        });
+
+        setStats({ 
+            playCount: totalCount, 
+            revenue: estimatedRevenue, 
+            achievementRate: achievementRate,
+            growthRate: growthRate, 
+            hasPrevData: hasPrevData
+        });
         setChartData(finalChartData);
     } catch (e) {
         console.error(e);
@@ -153,7 +210,8 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
         setLoading(false);
     }
   };
-const syncData = async () => {
+
+  const syncData = async () => {
       if (!storeInfo) return;
       const lastfmId = storeInfo.id;
       
@@ -240,6 +298,7 @@ const syncData = async () => {
           setSyncing(false);
       }
   };
+
   // 🚨 초기 로딩 대응
   if (loading && !storeInfo) {
     return <div style={{ padding: 100, textAlign: "center", color: "#888" }}>⏳ 데이터를 불러오고 있습니다...</div>;
@@ -255,6 +314,7 @@ const syncData = async () => {
     );
   }
  
+  // ✅ 기존 인라인 스타일 UI 복구
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto", padding: "20px" }}>
       {/* 어드민 전용 상단 바 */}
@@ -267,7 +327,6 @@ const syncData = async () => {
             ← 목록으로 돌아가기
           </button>
           
-          {/* 어드민만 볼 수 있는 데이터 강제 동기화 버튼 */}
           <button 
             onClick={syncData} 
             disabled={syncing}
@@ -290,8 +349,7 @@ const syncData = async () => {
 
       {/* 날짜 컨트롤 */}
       <div style={filterContainerStyle}>
-        <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-          <span style={{ color: "#ccc", fontSize: "14px", fontWeight: "bold" }}>기간 조회</span>
+        <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
           <input type="date" value={dateRange.start} onChange={(e)=>setDateRange({...dateRange, start:e.target.value})} style={inputStyle} />
           <span style={{ color: "#888" }}>~</span>
           <input type="date" value={dateRange.end} onChange={(e)=>setDateRange({...dateRange, end:e.target.value})} style={inputStyle} />
@@ -316,7 +374,7 @@ const syncData = async () => {
             </div>
             
             <a href={`https://www.last.fm/user/${storeInfo.id}`} target="_blank" rel="noopener noreferrer" style={lastfmBtnStyle}>
-                🎵 Last.fm 상세
+                Last.fm 상세
             </a>
         </div>
 
@@ -336,29 +394,84 @@ const syncData = async () => {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "20px", marginBottom: "30px" }}>
         <StatCard title="조회 기간 재생 수" count={`${stats.playCount.toLocaleString()} 곡`} color="#3b82f6" subText="유효 재생수 합계" />
         <StatCard title="예상 정산금" count={`${stats.revenue.toLocaleString()} 원`} color="#10b981" subText="구간별 차등 지급 적용" isHighlight={true} />
-        <StatCard title="정산 상태" count={stats.playCount >= 7500 ? "최대 달성" : "진행 중"} color="#9ca3af" subText="매월 1일 최종 확정" />
+        
+        {/* ✅ [신규] 전월 대비 성장률 카드 (인라인 스타일 적용) */}
+        <StatCard 
+          title="전월 대비 재생 수" 
+          count={
+            !stats.hasPrevData ? (
+              // 1️⃣ 전월 데이터가 없는 경우
+              <span style={{ fontSize: '20px', color: '#9ca3af' }}>-</span>
+            ) : (
+              // 2️⃣ 전월 데이터가 있는 경우 (기존 로직)
+              <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                {stats.growthRate > 0 ? '▲' : stats.growthRate < 0 ? '▼' : '-'} 
+                {Math.abs(stats.growthRate).toFixed(1)}%
+              </span>
+            )
+          }
+          // 색상: 데이터 없으면 회색, 있으면 증감에 따라 빨강/파랑
+          color={!stats.hasPrevData ? "#9ca3af" : (stats.growthRate >= 0 ? "#ef4444" : "#3b82f6")}
+          
+          // 하단 텍스트: 데이터 없으면 안내 메시지, 있으면 증감 메시지
+          subText={
+            !stats.hasPrevData 
+              ? "전월 기록이 없습니다" 
+              : (stats.growthRate >= 0 ? "지난달보다 증가했어요" : "지난달보다 감소했어요")
+          }
+          isHighlight={false}
+        />
       </div>
 
       {/* 📈 차트 */}
-      <div style={{ background: "#222", padding: "30px", borderRadius: "16px", border: "1px solid #333" }}>
-        <h3 style={{ fontSize: "18px", fontWeight: "bold", color: "white", marginBottom: "20px" }}>📈 일별 재생 추이</h3>
-        <div style={{ height: "300px", width: "100%" }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#444" />
-              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#888', fontSize: 12 }} dy={10} />
-              <YAxis axisLine={false} tickLine={false} tick={{ fill: '#888', fontSize: 12 }} />
-              <Tooltip contentStyle={{ backgroundColor: '#333', border: 'none', borderRadius: '8px', color: '#fff' }} />
-              <Line type="monotone" dataKey="plays" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+<div style={{ background: "#222", padding: "30px", borderRadius: "16px", border: "1px solid #333" }}>
+  <h3 style={{ fontSize: "18px", fontWeight: "bold", color: "white", marginBottom: "20px" }}>📈 일별 재생 추이</h3>
+  <div style={{ height: "300px", width: "100%" }}>
+    <ResponsiveContainer width="100%" height="100%">
+      <LineChart 
+        data={chartData}
+        // 👇 [핵심 수정 1] margin left를 -20 정도로 주어 Y축 공간만큼 당겨옵니다.
+        // right: 10은 마지막 점이 짤리지 않게 여유를 줍니다.
+        margin={{ top: 10, right: 10, left: -5, bottom: 0 }}
+      >
+        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#444" />
+        
+        <XAxis 
+          dataKey="name" 
+          axisLine={false} 
+          tickLine={false} 
+          tick={{ fill: '#888', fontSize: 12 }} 
+          dy={10} 
+          // 👇 X축 양옆에 여백을 살짝 주어 선이 벽에 붙지 않게 함 (선택사항)
+          padding={{ left: 10, right: 10 }} 
+        />
+        
+        <YAxis 
+          axisLine={false} 
+          tickLine={false} 
+          tick={{ fill: '#888', fontSize: 12 }} 
+          // 👇 [핵심 수정 2] Y축 너비를 30~40px로 고정해 불필요한 공백 제거
+          width={40} 
+        />
+        
+        <Tooltip contentStyle={{ backgroundColor: '#333', border: 'none', borderRadius: '8px', color: '#fff' }} />
+        <Line 
+          type="monotone" 
+          dataKey="plays" 
+          stroke="#3b82f6" 
+          strokeWidth={3} 
+          dot={{ r: 4 }} 
+          activeDot={{ r: 6 }} 
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  </div>
+</div>
     </div>
   );
 }
 
-// 스타일 보조 컴포넌트 및 객체
+// 스타일 보조 컴포넌트 및 객체 (기존 코드 그대로 복구)
 function StatCard({ title, count, color, subText, isHighlight = false }: any) {
   return (
     <div style={{ background: "#222", padding: "24px", borderRadius: "12px", borderTop: `4px solid ${color}`, boxShadow: isHighlight ? "0 4px 20px rgba(16, 185, 129, 0.1)" : "none" }}>
