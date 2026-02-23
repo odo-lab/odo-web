@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server';
 import axios from 'axios';
-// 1. 이미 검증된 초기화 인스턴스만 가져옵니다.
 import { adminDb } from "@/lib/firebase-admin";
-// 2. Timestamp와 FieldValue는 firestore 패키지에서 직접 가져와 충돌을 방지합니다.
 import { Timestamp, FieldValue } from "firebase-admin/firestore";
 
-// 캐시 방지 설정 (Next.js 빌드 시 정적 생성을 막음)
 export const dynamic = 'force-dynamic';
 
 /**
@@ -13,33 +10,53 @@ export const dynamic = 'force-dynamic';
  */
 async function scrapeAndSaveUser(userId: string, from: number, to: number, targetDate: string) {
   try {
+    const apiKey = process.env.LASTFM_API_KEY?.trim();
+    
+    // [디버깅 1] API 키가 실제로 존재하는지 확인 (길이만 출력하여 보안 유지)
+    console.log(`🔑 [${userId}] API Key 체크: ${apiKey ? `존재함 (길이: ${apiKey.length})` : '❌ 누락됨!'}`);
+
+    if (!apiKey) {
+      throw new Error("LASTFM_API_KEY 환경 변수가 없습니다.");
+    }
+
     const apiParams = {
       method: "user.getrecenttracks",
-      user: userId.trim(), // 공백 제거
-      api_key: process.env.LASTFM_API_KEY?.trim(), // 공백 제거
+      user: userId.trim(),
+      api_key: apiKey,
       format: "json",
-      from: Math.floor(from), // 확실한 정수
-      to: Math.floor(to),     // 확실한 정수
+      from: Math.floor(from),
+      to: Math.floor(to),
       limit: 200
     };
+
     const url = "https://ws.audioscrobbler.com/2.0/";
+    
+    // [디버깅 2] Axios가 실제로 만들어낸 완벽한 URL을 출력 (주소창에 복사/붙여넣기 가능)
+    const requestUrl = axios.getUri({ url, params: apiParams });
+    console.log(`🔗 [${userId}] 요청 URL: ${requestUrl}`);
+
     const response = await axios.get(url, { params: apiParams });
     
+    // API 응답 내부에 에러가 포함된 경우 처리
+    if (response.data.error) {
+      throw new Error(`Last.fm 내부 에러 (${response.data.error}): ${response.data.message}`);
+    }
+
     const tracks = response.data.recenttracks?.track;
 
-// 1. 트랙 데이터가 아예 없거나 빈 배열인 경우 안전하게 리턴
-        if (!tracks || (Array.isArray(tracks) && tracks.length === 0)) {
-        console.log(`[Info] ${userId}: No tracks found for this period.`);
-        return { userId, success: true, saved: 0 };
-        }
-
-        const trackArray = Array.isArray(tracks) ? tracks : [tracks];
-    // 현재 재생 중인 트랙(@attr.nowplaying) 제외
-    const completedTracks = trackArray.filter(t => !t["@attr"]?.nowplaying);
-    if (response.data.error) {
-      throw new Error(`Last.fm API Error ${response.data.error}: ${response.data.message}`);
+    // 트랙 데이터가 아예 없거나 빈 배열인 경우
+    if (!tracks || (Array.isArray(tracks) && tracks.length === 0)) {
+      console.log(`ℹ️ [${userId}] 해당 기간에 청취한 곡이 없습니다. (0곡)`);
+      return { userId, success: true, saved: 0 };
     }
-    if (completedTracks.length === 0) return { userId, success: true, saved: 0 };
+
+    const trackArray = Array.isArray(tracks) ? tracks : [tracks];
+    const completedTracks = trackArray.filter(t => !t["@attr"]?.nowplaying);
+
+    if (completedTracks.length === 0) {
+      console.log(`ℹ️ [${userId}] 완료된 곡이 없습니다 (현재 재생 중인 곡만 있음).`);
+      return { userId, success: true, saved: 0 };
+    }
 
     const batch = adminDb.batch();
     let savedCount = 0;
@@ -48,75 +65,84 @@ async function scrapeAndSaveUser(userId: string, from: number, to: number, targe
       const timestamp = parseInt(track.date?.uts);
       if (!timestamp) continue;
 
-      // 지정하신 테스트용 컬렉션 명칭 확인: listening_history2
-      const docRef = adminDb.collection("listening_history2").doc(`${userId}_${timestamp}`);
+      const docId = `${userId}_${timestamp}`;
+      const docRef = adminDb.collection("listening_history2").doc(docId);
       
+      // [복원] 이전 스크린샷과 100% 동일하게 모든 Mbid 및 URL 필드 추가
       batch.set(docRef, {
         userId,
         date: targetDate,
-        timestamp: Timestamp.fromMillis(timestamp * 1000), // import한 Timestamp 사용
-        artist: track.artist?.["#text"] || "Unknown Artist",
+        timestamp: Timestamp.fromMillis(timestamp * 1000),
+        artist: track.artist?.["#text"] || track.artist?.name || "Unknown Artist",
+        artistMbid: track.artist?.mbid || "",
         track: track.name || "Unknown Track",
+        trackMbid: track.mbid || "",
         album: track.album?.["#text"] || "Unknown Album",
+        albumMbid: track.album?.mbid || "",
+        url: track.url || "",
         imageUrl: track.image?.[2]?.["#text"] || "",
-        createdAt: FieldValue.serverTimestamp(), // import한 FieldValue 사용
+        createdAt: FieldValue.serverTimestamp(),
       }, { merge: true });
+      
       savedCount++;
     }
 
     await batch.commit();
+    console.log(`✅ [${userId}] 성공: ${savedCount}곡 저장 완료`);
     return { userId, success: true, saved: savedCount };
+
   } catch (error: any) {
-    console.error(`[Scraper Error] ${userId}:`, error.message);
-    return { userId, success: false, error: error.message };
+    // [디버깅 3] 400 에러 발생 시, Last.fm이 보내준 "진짜 이유"를 추출하여 출력
+    const errorMessage = error.response?.data 
+      ? JSON.stringify(error.response.data) 
+      : error.message;
+      
+    console.error(`❌ [Scraper Error] ${userId} 실패 사유:`, errorMessage);
+    return { userId, success: false, error: errorMessage };
   }
 }
 
-
 export async function GET(req: Request) {
-  console.log("🚀 Last.fm 스크래퍼 테스트 시작 (2명)");
+  console.log("=========================================");
+  console.log("🚀 Last.fm 스크래퍼 디버깅 모드 시작 (2명)");
+  console.log("=========================================");
 
   try {
-    // 1. monitored_users 컬렉션에서 유저 2명 가져오기 
-    // (기존 syncMissingData 로직처럼 유저명 필드를 정확히 매칭해야 함)
-    const usersSnapshot = await adminDb.collection("monitored_users")
-      .limit(2)
-      .get();
+    const usersSnapshot = await adminDb.collection("monitored_users").limit(2).get();
 
     if (usersSnapshot.empty) {
       console.warn("⚠️ monitored_users 컬렉션에 유저가 없습니다.");
       return NextResponse.json({ success: true, message: "No users found" });
     }
 
-    // 문서 ID가 Last.fm 아이디인 경우 doc.id 사용
     const userIds = usersSnapshot.docs.map(doc => doc.id);
 
-    // 2. KST 기준 어제 날짜 계산 (전과 동일)
+    // KST 기준 그저께(-2) 날짜 계산 (테스트용)
     const now = new Date();
     const koreaTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
     koreaTime.setDate(koreaTime.getDate() - 2);
+    
     const targetDate = koreaTime.toISOString().split("T")[0];
-
     const from = Math.floor(new Date(`${targetDate}T00:00:00+09:00`).getTime() / 1000);
     const to = Math.floor(new Date(`${targetDate}T23:59:59+09:00`).getTime() / 1000);
 
-    console.log(`📅 대상: ${targetDate} (From: ${from}, To: ${to})`);
+    console.log(`📅 테스트 대상 날짜: ${targetDate} (From: ${from}, To: ${to})`);
 
-    // 3. 순차적으로 스크래핑 실행
     const results = [];
     for (const userId of userIds) {
       const res = await scrapeAndSaveUser(userId, from, to, targetDate);
       results.push(res);
     }
 
-    // 4. 로그 저장
+    // 로그 저장
     await adminDb.collection("scraper_logs").add({
       executedAt: FieldValue.serverTimestamp(),
       date: targetDate,
-      type: "test_run_2_users",
+      type: "test_run_debug",
       results
     });
 
+    console.log("🎉 디버깅 테스트 완료!");
     return NextResponse.json({ 
       success: true, 
       targetDate, 
@@ -128,8 +154,7 @@ export async function GET(req: Request) {
     console.error("🔥 Critical Error:", error);
     return NextResponse.json({ 
       success: false, 
-      error: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: error.message
     }, { status: 500 });
   }
 }
