@@ -22,5 +22,6 @@ export default async function Page() {
   }
 
   // ✅ 완성된 데이터를 자식 컴포넌트(HomeClient)에게 props로 넘겨줍니다.
-  return <HomeClient initialPlaylists={playlists} />;
+  // page.tsx 수정
+  return <HomeClient initialPlaylists={playlists as Playlist[]} />;
 }
