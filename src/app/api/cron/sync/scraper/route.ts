@@ -26,9 +26,14 @@ async function scrapeAndSaveUser(userId: string, from: number, to: number, targe
     const response = await axios.get(url, { params: apiParams });
     
     const tracks = response.data.recenttracks?.track;
-    if (!tracks) return { userId, success: true, saved: 0 };
-    
-    const trackArray = Array.isArray(tracks) ? tracks : [tracks];
+
+// 1. 트랙 데이터가 아예 없거나 빈 배열인 경우 안전하게 리턴
+        if (!tracks || (Array.isArray(tracks) && tracks.length === 0)) {
+        console.log(`[Info] ${userId}: No tracks found for this period.`);
+        return { userId, success: true, saved: 0 };
+        }
+
+        const trackArray = Array.isArray(tracks) ? tracks : [tracks];
     // 현재 재생 중인 트랙(@attr.nowplaying) 제외
     const completedTracks = trackArray.filter(t => !t["@attr"]?.nowplaying);
     if (response.data.error) {
