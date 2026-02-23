@@ -1,27 +1,16 @@
 import { NextResponse } from 'next/server';
 import axios from 'axios';
+// 1. 이미 검증된 초기화 인스턴스만 가져옵니다.
 import { adminDb } from "@/lib/firebase-admin";
-import * as admin from "firebase-admin";
+// 2. Timestamp와 FieldValue는 firestore 패키지에서 직접 가져와 충돌을 방지합니다.
+import { Timestamp, FieldValue } from "firebase-admin/firestore";
 
-if (!admin.apps.length) {
-  try {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        // 이 부분이 핵심입니다. 환경 변수가 어떻게 들어오든 대응 가능하도록 처리
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-      }),
-    });
-    console.log("Firebase Admin Initialized Successfully");
-  } catch (error: any) {
-    console.error("Firebase Admin Initialization Error:", error.stack);
-  }
-}
+// 캐시 방지 설정 (Next.js 빌드 시 정적 생성을 막음)
+export const dynamic = 'force-dynamic';
 
-const db = admin.firestore();
-
-// --- Last.fm API 스크래핑 함수 ---
+/**
+ * Last.fm API 스크래핑 및 저장 함수
+ */
 async function scrapeAndSaveUser(userId: string, from: number, to: number, targetDate: string) {
   try {
     const url = "https://ws.audioscrobbler.com/2.0/";
@@ -31,40 +20,46 @@ async function scrapeAndSaveUser(userId: string, from: number, to: number, targe
         user: userId,
         api_key: process.env.LASTFM_API_KEY,
         format: "json",
-        from, to, limit: 200
-      }
+        from,
+        to,
+        limit: 200
+      },
+      timeout: 10000 // 10초 타임아웃 추가
     });
 
     const tracks = response.data.recenttracks?.track;
     if (!tracks) return { userId, success: true, saved: 0 };
 
     const trackArray = Array.isArray(tracks) ? tracks : [tracks];
+    // 현재 재생 중인 트랙(@attr.nowplaying) 제외
     const completedTracks = trackArray.filter(t => !t["@attr"]?.nowplaying);
 
-    const batch = db.batch();
+    if (completedTracks.length === 0) return { userId, success: true, saved: 0 };
+
+    const batch = adminDb.batch();
     let savedCount = 0;
 
     for (const track of completedTracks) {
       const timestamp = parseInt(track.date?.uts);
       if (!timestamp) continue;
 
-      // 테스트 컬렉션: listening_history2
-      const docRef = db.collection("listening_history2").doc(`${userId}_${timestamp}`);
+      // 지정하신 테스트용 컬렉션 명칭 확인: listening_history2
+      const docRef = adminDb.collection("listening_history2").doc(`${userId}_${timestamp}`);
       
       batch.set(docRef, {
         userId,
         date: targetDate,
-        timestamp: admin.firestore.Timestamp.fromMillis(timestamp * 1000),
-        artist: track.artist?.["#text"] || "Unknown",
-        track: track.name || "Unknown",
-        album: track.album?.["#text"] || "Unknown",
+        timestamp: Timestamp.fromMillis(timestamp * 1000), // import한 Timestamp 사용
+        artist: track.artist?.["#text"] || "Unknown Artist",
+        track: track.name || "Unknown Track",
+        album: track.album?.["#text"] || "Unknown Album",
         imageUrl: track.image?.[2]?.["#text"] || "",
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdAt: FieldValue.serverTimestamp(), // import한 FieldValue 사용
       }, { merge: true });
       savedCount++;
     }
 
-    if (savedCount > 0) await batch.commit();
+    await batch.commit();
     return { userId, success: true, saved: savedCount };
   } catch (error: any) {
     console.error(`[Scraper Error] ${userId}:`, error.message);
@@ -72,23 +67,28 @@ async function scrapeAndSaveUser(userId: string, from: number, to: number, targe
   }
 }
 
-// --- API Handler ---
+/**
+ * GET Handler
+ */
 export async function GET(req: Request) {
+  console.log("🚀 Last.fm 스크래퍼 테스트 시작 (2명)");
+
   try {
-    // 1. monitored_user 컬렉션에서 유저 2명만 가져오기 (테스트용 limit)
-    console.log("Fetching monitored users from Firestore...");
-    const usersSnapshot = await db.collection("monitored_user")
-      .limit(2) // 테스트를 위해 2명으로 제한
+    // 1. monitored_user 컬렉션에서 유저 2명 가져오기 
+    // (기존 syncMissingData 로직처럼 유저명 필드를 정확히 매칭해야 함)
+    const usersSnapshot = await adminDb.collection("monitored_user")
+      .limit(2)
       .get();
 
     if (usersSnapshot.empty) {
-      return NextResponse.json({ success: true, message: "No monitored users found." });
+      console.warn("⚠️ monitored_user 컬렉션에 유저가 없습니다.");
+      return NextResponse.json({ success: true, message: "No users found" });
     }
 
-    // 문서 ID 또는 별도 필드(예: lastfmId)를 유저명으로 사용 (DB 구조에 맞춰 수정 가능)
-    const userIds = usersSnapshot.docs.map(doc => doc.id); 
+    // 문서 ID가 Last.fm 아이디인 경우 doc.id 사용
+    const userIds = usersSnapshot.docs.map(doc => doc.id);
 
-    // 2. 날짜 설정 (한국 시간 기준 어제)
+    // 2. KST 기준 어제 날짜 계산 (전과 동일)
     const now = new Date();
     const koreaTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
     koreaTime.setDate(koreaTime.getDate() - 1);
@@ -97,32 +97,36 @@ export async function GET(req: Request) {
     const from = Math.floor(new Date(`${targetDate}T00:00:00+09:00`).getTime() / 1000);
     const to = Math.floor(new Date(`${targetDate}T23:59:59+09:00`).getTime() / 1000);
 
-    // 3. 순차 처리 (테스트 2명이라 병렬 없이 진행)
+    console.log(`📅 대상: ${targetDate} (From: ${from}, To: ${to})`);
+
+    // 3. 순차적으로 스크래핑 실행
     const results = [];
     for (const userId of userIds) {
-      const result = await scrapeAndSaveUser(userId, from, to, targetDate);
-      results.push(result);
+      const res = await scrapeAndSaveUser(userId, from, to, targetDate);
+      results.push(res);
     }
 
     // 4. 로그 저장
-    await db.collection("scraper_logs").add({
-      executedAt: admin.firestore.FieldValue.serverTimestamp(),
+    await adminDb.collection("scraper_logs").add({
+      executedAt: FieldValue.serverTimestamp(),
       date: targetDate,
-      type: "cron_nextjs_test",
-      targetCollection: "listening_history2",
-      totalUsers: userIds.length,
+      type: "test_run_2_users",
       results
     });
 
     return NextResponse.json({ 
       success: true, 
       targetDate, 
-      message: "Test run completed for 2 users.",
+      processedCount: userIds.length,
       results 
     });
 
   } catch (error: any) {
-    console.error("Critical Scraper Error:", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    console.error("🔥 Critical Error:", error);
+    return NextResponse.json({ 
+      success: false, 
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    }, { status: 500 });
   }
 }
