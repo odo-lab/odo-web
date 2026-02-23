@@ -1,16 +1,28 @@
 import * as admin from "firebase-admin";
 
-// 환경 변수에서 데이터를 가져올 때, 
-// .env.local에 적힌 이름과 정확히 일치하는지 확인하세요.
+// 1. 환경 변수 추출 및 전처리
 const projectId = process.env.FIREBASE_PROJECT_ID;
-const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-// 개행 문자(\n)가 문자열로 들어오는 경우를 대비해 실제 줄바꿈으로 변환합니다.
-const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+const clientEmail = process.env.FIREBASE_CLIENT_EMAIL?.trim(); // 앞뒤 공백 제거
+// \n 이중 슬래시 처리 및 실제 줄바꿈 문자 보정
+const privateKey = process.env.FIREBASE_PRIVATE_KEY
+  ?.replace(/\\n/g, "\n")
+  .replace(/\n/g, "\n");
 
+// 2. 초기화 로직
 if (!admin.apps.length) {
-  // 필수 값이 없을 경우 에러를 발생시켜 디버깅을 돕습니다.
+  console.log("🚀 [Firebase Admin] 초기화 시도 중...");
+
+  // [디버깅 로그] Vercel Runtime Logs에서 확인 가능
+  console.log("📊 현재 설정된 인증 정보 요약:", {
+    projectId: projectId || "❌ 누락",
+    clientEmail: clientEmail || "❌ 누락",
+    privateKeyFound: privateKey ? "✅ 있음" : "❌ 없음",
+    privateKeyLength: privateKey?.length || 0,
+    privateKeyStart: privateKey?.substring(0, 25) + "...", // 형식 확인용
+  });
+
   if (!projectId || !clientEmail || !privateKey) {
-    console.error("❌ Firebase Admin 설정 값이 누락되었습니다. .env.local 파일을 확인하세요.");
+    console.error("❌ [Firebase Admin] 필수 설정 값이 없습니다. 환경 변수를 확인하세요.");
   } else {
     try {
       admin.initializeApp({
@@ -20,11 +32,22 @@ if (!admin.apps.length) {
           privateKey,
         }),
       });
-      console.log("✅ Firebase Admin이 성공적으로 초기화되었습니다.");
-    } catch (error) {
-      console.error("❌ Firebase Admin 초기화 중 오류 발생:", error);
+      console.log("✅ [Firebase Admin] 성공적으로 초기화되었습니다.");
+    } catch (error: any) {
+      console.error("❌ [Firebase Admin] 초기화 중 오류 발생:", error.message);
     }
   }
 }
 
+// 3. 인스턴스 내보내기
 export const adminDb = admin.firestore();
+
+// [중요] Firestore 연결 상태 확인을 위한 헬퍼 (선택 사항)
+export const checkFirestoreConn = async () => {
+  try {
+    await adminDb.listCollections();
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
