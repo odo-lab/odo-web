@@ -1,16 +1,22 @@
 import { NextResponse } from 'next/server';
-import admin from 'firebase-admin';
 import axios from 'axios';
+import { adminDb } from "@/lib/firebase-admin";
+import * as admin from "firebase-admin";
 
-// Firebase Admin 초기화 (싱글톤)
 if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    }),
-  });
+  try {
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        // 이 부분이 핵심입니다. 환경 변수가 어떻게 들어오든 대응 가능하도록 처리
+        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      }),
+    });
+    console.log("Firebase Admin Initialized Successfully");
+  } catch (error: any) {
+    console.error("Firebase Admin Initialization Error:", error.stack);
+  }
 }
 
 const db = admin.firestore();

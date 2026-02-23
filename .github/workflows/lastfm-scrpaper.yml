@@ -12,5 +12,4 @@ jobs:
     steps:
       - name: Call Scraper API
         run: |
-          curl -X GET "https://YOUR_DOMAIN.com/api/cron/scraper" \
-          -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}"
+          curl -X GET "https://onedayofmusic.com/api/cron/scraper"
