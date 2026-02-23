@@ -74,14 +74,14 @@ export async function GET(req: Request) {
   console.log("🚀 Last.fm 스크래퍼 테스트 시작 (2명)");
 
   try {
-    // 1. monitored_user 컬렉션에서 유저 2명 가져오기 
+    // 1. monitored_users 컬렉션에서 유저 2명 가져오기 
     // (기존 syncMissingData 로직처럼 유저명 필드를 정확히 매칭해야 함)
-    const usersSnapshot = await adminDb.collection("monitored_user")
+    const usersSnapshot = await adminDb.collection("monitored_users")
       .limit(2)
       .get();
 
     if (usersSnapshot.empty) {
-      console.warn("⚠️ monitored_user 컬렉션에 유저가 없습니다.");
+      console.warn("⚠️ monitored_users 컬렉션에 유저가 없습니다.");
       return NextResponse.json({ success: true, message: "No users found" });
     }
 
