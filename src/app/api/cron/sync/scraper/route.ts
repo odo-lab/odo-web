@@ -91,7 +91,7 @@ export async function GET(req: Request) {
     // 2. KST 기준 어제 날짜 계산 (전과 동일)
     const now = new Date();
     const koreaTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
-    koreaTime.setDate(koreaTime.getDate() - 1);
+    koreaTime.setDate(koreaTime.getDate() - 2);
     const targetDate = koreaTime.toISOString().split("T")[0];
 
     const from = Math.floor(new Date(`${targetDate}T00:00:00+09:00`).getTime() / 1000);
