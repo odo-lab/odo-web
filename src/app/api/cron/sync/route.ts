@@ -3,42 +3,44 @@ import { adminDb } from "@/lib/firebase-admin";
 import * as admin from "firebase-admin";
 
 export async function GET(request: Request) {
-  console.log("🚀 Cron Job 시작: 기존 대시보드 로직 기반 데이터 동기화");
+  console.log("🚀 Cron Job 시작: syncMissingData와 동일한 로직으로 실행");
 
   try {
-    // 1. 날짜 설정 (KST 기준 어제 구하기)
-    const now = new Date();
+    // 1. KST 기준 어제 날짜 문자열 구하기
     const KST_OFFSET = 9 * 60 * 60 * 1000;
+    const now = new Date();
     const todayKst = new Date(now.getTime() + KST_OFFSET);
     const yesterdayKst = new Date(todayKst.getTime() - (24 * 60 * 60 * 1000));
     const dateStr = yesterdayKst.toISOString().split('T')[0];
 
-    // 쿼리 범위 설정 (기존 로직 방식: KST 날짜의 시작과 끝을 UTC로 계산)
-    const start = new Date(dateStr + "T00:00:00Z"); // 실제로는 한국 시간 09시가 될 수 있으므로 주의 필요
-    // 더 정확하게는 기존 로직의 start/end 설정을 따릅니다.
-    const queryStart = new Date(new Date(dateStr).setHours(0,0,0,0));
-    const queryEnd = new Date(new Date(dateStr).setHours(23,59,59,999));
+    // 2. 쿼리 범위 설정 (syncMissingData와 동일하게 00:00:00 ~ 23:59:59 설정)
+    // UTC 기준이 아닌 로컬 타임 숫자로 생성하여 Firestore Timestamp로 변환
+    const start = new Date(dateStr); start.setHours(0, 0, 0, 0);
+    const end = new Date(dateStr); end.setHours(23, 59, 59, 999);
 
-    console.log(`📅 집계 대상 날짜(KST): ${dateStr}`);
+    console.log(`📅 대상 날짜: ${dateStr} (범위: ${start.toISOString()} ~ ${end.toISOString()})`);
 
-    // 2. 기초 데이터 로드 (User, Artist)
+    // 3. 기초 데이터 로드 (User, Artist) - syncMissingData 1단계
     const [usersSnap, artistsSnap] = await Promise.all([
       adminDb.collection("monitored_users").get(),
       adminDb.collection("monitored_artists").get()
     ]);
 
     const userMap: Record<string, any> = {};
-    usersSnap.forEach(d => {
-      const data = d.data();
-      if (data.lastfm_username) userMap[data.lastfm_username] = data;
+    usersSnap.forEach(doc => {
+      const d = doc.data();
+      if (d.lastfm_username) userMap[d.lastfm_username] = d;
     });
 
-    const allowedArtists = new Set(artistsSnap.docs.map(d => d.id.trim().toLowerCase()));
+    const allowedArtists = new Set<string>();
+    artistsSnap.forEach(doc => {
+      allowedArtists.add(doc.id.trim().toLowerCase());
+    });
 
-    // 3. 로그 분석 (기존 syncMissingData 로직 이식)
+    // 4. 전체 로그 분석 및 중복 제거 - syncMissingData 2단계
     const historySnap = await adminDb.collection("listening_history")
-      .where("timestamp", ">=", queryStart)
-      .where("timestamp", "<=", queryEnd)
+      .where("timestamp", ">=", start)
+      .where("timestamp", "<=", end)
       .get();
 
     const uniqueRecords = new Map();
@@ -46,68 +48,73 @@ export async function GET(request: Request) {
       const d = doc.data();
       const userId = d.userId || d.user_id;
       if (!userId) return;
-      
+
       const utcDate = d.timestamp instanceof admin.firestore.Timestamp 
         ? d.timestamp.toDate() 
         : new Date(d.timestamp);
-      
+
       const dedupKey = `${userId}|${utcDate.getTime()}`;
       if (!uniqueRecords.has(dedupKey)) {
         uniqueRecords.set(dedupKey, { ...d, timestamp: utcDate, userId });
       }
     });
 
-    // 4. KST 기준 집계
+    // 5. KST 기준 집계 (가장 중요한 부분)
     const userDailyStats: Record<string, any> = {};
     uniqueRecords.forEach((record) => {
       if (!record.artist) return;
       const normalizedArtist = record.artist.trim().toLowerCase();
       if (!allowedArtists.has(normalizedArtist)) return;
 
-      // 로그의 timestamp에 9시간을 더해 한국 날짜 판별
-      const kstDate = new Date(record.timestamp.getTime() + KST_OFFSET);
-      const rowDateStr = kstDate.toISOString().split('T')[0];
+      // syncMissingData와 동일하게 9시간 더해서 날짜 판별
+      const kstDateForRecord = new Date(record.timestamp.getTime() + KST_OFFSET);
+      const rowDateStr = kstDateForRecord.toISOString().split('T')[0];
       
-      if (rowDateStr !== dateStr) return; // 정확히 어제 데이터만 걸러냄
+      // 쿼리 범위 내에 있더라도 변환된 KST 날짜가 대상 날짜와 다르면 제외 (경계값 보정)
+      if (rowDateStr !== dateStr) return;
 
-      const userKey = record.userId;
+      const userKey = `${rowDateStr}_${record.userId}`; 
       if (!userDailyStats[userKey]) {
-        userDailyStats[userKey] = { trackCounts: {} };
+        userDailyStats[userKey] = { date: rowDateStr, userId: record.userId, trackCounts: {} };
       }
       const trackKey = `${record.track}|${normalizedArtist}`;
       userDailyStats[userKey].trackCounts[trackKey] = (userDailyStats[userKey].trackCounts[trackKey] || 0) + 1;
     });
 
-    // 5. 데이터 가공 및 500개씩 끊어서 Batch 저장
+    // 6. 데이터 가공 (DAILY_MAX_COUNT 적용)
     const finalStats: any[] = [];
-    Object.entries(userDailyStats).forEach(([userId, data]: any) => {
+    const DAILY_MAX_COUNT = 10;
+
+    Object.values(userDailyStats).forEach((dailyUser: any) => {
       let validPlays = 0;
-      Object.values(data.trackCounts).forEach((count: any) => {
-        validPlays += Math.min(count, 10); // DAILY_MAX_COUNT = 10
+      Object.values(dailyUser.trackCounts).forEach((count: any) => {
+        validPlays += Math.min(count, DAILY_MAX_COUNT);
       });
 
-      const userInfo = userMap[userId] || { store_name: "Unknown", franchise: "personal", owner_name: "Unknown" };
+      const userInfo = userMap[dailyUser.userId] || { store_name: "Unknown", franchise: "personal", owner_name: "Unknown" };
       finalStats.push({
-        date: dateStr,
-        lastfm_username: userId,
+        date: dailyUser.date,
+        lastfm_username: dailyUser.userId,
         play_count: validPlays,
         store_name: userInfo.store_name,
         franchise: userInfo.franchise,
-        owner_name: userInfo.owner_name,
+        owner_name: userInfo.owner_name || "Unknown",
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       });
     });
 
-    // Batch Commit (500개 단위 처리)
-    const batchSize = 500;
-    for (let i = 0; i < finalStats.length; i += batchSize) {
-      const batch = adminDb.batch();
-      const chunk = finalStats.slice(i, i + batchSize);
-      chunk.forEach(stat => {
-        const ref = adminDb.collection("daily_stats").doc(`${stat.date}_${stat.lastfm_username}`);
-        batch.set(ref, stat, { merge: true });
-      });
-      await batch.commit();
+    // 7. 배치 저장 (500개 단위) - syncMissingData 3단계
+    if (finalStats.length > 0) {
+      const batchSize = 500;
+      for (let i = 0; i < finalStats.length; i += batchSize) {
+        const batch = adminDb.batch();
+        const chunk = finalStats.slice(i, i + batchSize);
+        chunk.forEach(stat => {
+          const ref = adminDb.collection("daily_stats").doc(`${stat.date}_${stat.lastfm_username}`);
+          batch.set(ref, stat, { merge: true });
+        });
+        await batch.commit();
+      }
     }
 
     return NextResponse.json({ success: true, date: dateStr, count: finalStats.length });
