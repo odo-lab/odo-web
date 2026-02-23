@@ -13,27 +13,27 @@ export const dynamic = 'force-dynamic';
  */
 async function scrapeAndSaveUser(userId: string, from: number, to: number, targetDate: string) {
   try {
+    const apiParams = {
+      method: "user.getrecenttracks",
+      user: userId.trim(), // 공백 제거
+      api_key: process.env.LASTFM_API_KEY?.trim(), // 공백 제거
+      format: "json",
+      from: Math.floor(from), // 확실한 정수
+      to: Math.floor(to),     // 확실한 정수
+      limit: 200
+    };
     const url = "https://ws.audioscrobbler.com/2.0/";
-    const response = await axios.get(url, {
-      params: {
-        method: "user.getrecenttracks",
-        user: userId,
-        api_key: process.env.LASTFM_API_KEY,
-        format: "json",
-        from,
-        to,
-        limit: 200
-      },
-      timeout: 10000 // 10초 타임아웃 추가
-    });
-
+    const response = await axios.get(url, { params: apiParams });
+    
     const tracks = response.data.recenttracks?.track;
     if (!tracks) return { userId, success: true, saved: 0 };
-
+    
     const trackArray = Array.isArray(tracks) ? tracks : [tracks];
     // 현재 재생 중인 트랙(@attr.nowplaying) 제외
     const completedTracks = trackArray.filter(t => !t["@attr"]?.nowplaying);
-
+    if (response.data.error) {
+      throw new Error(`Last.fm API Error ${response.data.error}: ${response.data.message}`);
+    }
     if (completedTracks.length === 0) return { userId, success: true, saved: 0 };
 
     const batch = adminDb.batch();
@@ -67,9 +67,7 @@ async function scrapeAndSaveUser(userId: string, from: number, to: number, targe
   }
 }
 
-/**
- * GET Handler
- */
+
 export async function GET(req: Request) {
   console.log("🚀 Last.fm 스크래퍼 테스트 시작 (2명)");
 
