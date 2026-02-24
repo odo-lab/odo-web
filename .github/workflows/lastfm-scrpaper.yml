@@ -12,4 +12,4 @@ jobs:
     steps:
       - name: Call Scraper API
         run: |
-          curl -X GET "https://onedayofmusic.com/api/cron/scraper"
+          curl -X GET "https://onedayofmusic.com/api/cron/sync/scraper"
