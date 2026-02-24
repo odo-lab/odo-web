@@ -27,7 +27,8 @@ export default function PlaylistsClient() {
         setLoading(true);
         const playlistsRef = collection(db, "playlists");
         // 생성일 순 또는 클릭수 순으로 정렬해서 가져올 수 있습니다.
-        const q = query(playlistsRef, orderBy("createdAt", "desc"));
+        // PlaylistsClient.tsx 내부 수정
+        const q = query(playlistsRef, orderBy("order", "asc")); 
         const querySnapshot = await getDocs(q);
         
         const list = querySnapshot.docs.map(doc => ({
