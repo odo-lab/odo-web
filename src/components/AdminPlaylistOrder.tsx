@@ -8,19 +8,30 @@ import { Playlist } from "@/lib/playlists";
 
 export default function AdminPlaylistOrder() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [isMounted, setIsMounted] = useState(false);
 
-  // 1. 초기 데이터 불러오기 (order 순으로)
+  // 1. Next.js 렌더링 에러(Hydration mismatch) 방지
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // 2. 초기 데이터 불러오기 (order 순으로)
   useEffect(() => {
     const fetchPlaylists = async () => {
-      const q = query(collection(db, "playlists"), orderBy("order", "asc"));
-      const snap = await getDocs(q);
-      const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Playlist[];
-      setPlaylists(list);
+      try {
+        const q = query(collection(db, "playlists"), orderBy("order", "asc"));
+        const snap = await getDocs(q);
+        // 짧은 유튜브 id 대신 파이어베이스 고유 문서 id가 덮어써지도록 순서 유지
+        const list = snap.docs.map(doc => ({ ...doc.data(), id: doc.id })) as Playlist[];
+        setPlaylists(list);
+      } catch (error) {
+        console.error("데이터 불러오기 실패:", error);
+      }
     };
     fetchPlaylists();
   }, []);
 
-  // 2. 드래그 종료 시 실행되는 함수
+  // 3. 드래그 종료 시 실행되는 함수
   const onDragEnd = async (result: DropResult) => {
     if (!result.destination) return;
 
@@ -30,7 +41,7 @@ export default function AdminPlaylistOrder() {
 
     setPlaylists(items); // 먼저 UI를 업데이트 (낙관적 업데이트)
 
-    // 3. DB에 일괄 저장 (Batch 활용)
+    // 4. DB에 일괄 저장 (Batch 활용)
     const batch = writeBatch(db);
     items.forEach((item, index) => {
       const ref = doc(db, "playlists", item.id);
@@ -44,6 +55,9 @@ export default function AdminPlaylistOrder() {
       console.error("순서 저장 실패:", e);
     }
   };
+
+  // 클라이언트 마운트 전에는 렌더링하지 않음 (DND 라이브러리 필수 사항)
+  if (!isMounted) return null;
 
   return (
     <div className="admin-container">

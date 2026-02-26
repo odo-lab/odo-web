@@ -32,7 +32,7 @@ export default function PlaylistsClient() {
         const querySnapshot = await getDocs(q);
         
         const list = querySnapshot.docs.map(doc => ({
-          ...doc.data()
+          ...doc.data(),id: doc.id
         })) as Playlist[];
         
         setAllPlaylists(list);
