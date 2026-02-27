@@ -6,18 +6,22 @@ import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, writeBatch, doc, Timestamp, getDoc } from "firebase/firestore";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
+// ✅ 인증 관련 훅 및 파이어베이스 탈퇴 함수 추가
+import { useAuth } from "@/lib/auth-context";
+import { deleteUser } from "firebase/auth";
+
 interface UserDashboardProps {
-  targetId: string; // monitored_users의 문서 ID (또는 UID)
+  targetId: string; 
   isAdmin?: boolean; 
 }
 
 export default function UserDashboard({ targetId, isAdmin = false }: UserDashboardProps) {
   const router = useRouter();
+  const { user } = useAuth(); // ✅ 현재 로그인된 유저 정보 가져오기
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [storeInfo, setStoreInfo] = useState<any>(null);
   
-  // ✅ 성장률(growthRate) 상태 추가
   const [stats, setStats] = useState({ 
     playCount: 0, 
     revenue: 0, 
@@ -62,24 +66,19 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
         let storeData = null;
         let realLastfmId = "";
 
-        const docRef = doc(db, "monitored_users", targetId);
-        const docSnap = await getDoc(docRef);
+        // 💡 1. 헛스윙하던 getDoc 부분 삭제! 바로 uid로 검색(query)합니다.
+        const storesRef = collection(db, "monitored_users");
+        const q = query(storesRef, where("uid", "==", targetId));
+        const querySnapshot = await getDocs(q);
 
-        if (docSnap.exists()) {
-          storeData = docSnap.data();
+        // 💡 2. 데이터가 있으면 가져오기
+        if (!querySnapshot.empty) {
+          const d = querySnapshot.docs[0];
+          storeData = d.data();
           realLastfmId = storeData.lastfm_username;
-        } else {
-          const storesRef = collection(db, "monitored_users");
-          const q = query(storesRef, where("uid", "==", targetId));
-          const querySnapshot = await getDocs(q);
-
-          if (!querySnapshot.empty) {
-            const d = querySnapshot.docs[0];
-            storeData = d.data();
-            realLastfmId = storeData.lastfm_username;
-          }
         }
 
+        // 💡 3. 정보 세팅
         if (storeData && realLastfmId) {
           setStoreInfo({ ...storeData, id: realLastfmId });
           await fetchDashboardData(realLastfmId, dateRange.start, dateRange.end, storeData.franchise);
@@ -119,10 +118,16 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
     try {
         const statsColl = collection(db, "daily_stats");
         
-        // 1. 현재 기간 데이터 조회
-        const qStats = query(statsColl, where("date", ">=", startStr), where("date", "<=", endStr));
+        // 🔒 [보안 & 성능 완벽 패치 1]
+        // 전체 데이터를 긁어오지 않고, DB 쿼리 단계에서 "내 데이터(lastfm_username)"만 콕 집어서 가져옵니다.
+        // 이렇게 해야 보안 규칙에서 튕기지 않으며, DB 읽기 요금이 수십 배 절약됩니다!
+        const qStats = query(
+            statsColl, 
+            where("lastfm_username", "==", lastfmId), 
+            where("date", ">=", startStr), 
+            where("date", "<=", endStr)
+        );
         
-        // 2. 전월 동기간 데이터 조회 (비교용)
         const prevStart = new Date(startStr);
         prevStart.setMonth(prevStart.getMonth() - 1);
         const prevEnd = new Date(endStr);
@@ -130,29 +135,28 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
         const prevStartStr = formatYMD(prevStart);
         const prevEndStr = formatYMD(prevEnd);
 
-        const qPrevStats = query(statsColl, where("date", ">=", prevStartStr), where("date", "<=", prevEndStr));
+        // 이전 달 데이터도 동일하게 내 것만 콕 집어서!
+        const qPrevStats = query(
+            statsColl, 
+            where("lastfm_username", "==", lastfmId), 
+            where("date", ">=", prevStartStr), 
+            where("date", "<=", prevEndStr)
+        );
 
-        // 병렬로 데이터 가져오기
         const [statsSnap, prevStatsSnap] = await Promise.all([
             getDocs(qStats),
             getDocs(qPrevStats)
         ]);
         
-        // 현재 기간 집계
         const myStats: any[] = [];
-        statsSnap.forEach(doc => {
-            const d = doc.data();
-            if (d.lastfm_username === lastfmId || d.userId === lastfmId) myStats.push(d);
-        });
+        // 이미 내 것만 가져왔으므로 필터링할 필요 없이 바로 담습니다.
+        statsSnap.forEach(doc => myStats.push(doc.data()));
 
-        // 전월 기간 집계
         let prevTotalCount = 0;
         prevStatsSnap.forEach(doc => {
             const d = doc.data();
-            if (d.lastfm_username === lastfmId || d.userId === lastfmId) {
-                const count = d.play_count !== undefined ? d.play_count : (d.playCount || 0);
-                prevTotalCount += count;
-            }
+            const count = d.play_count !== undefined ? d.play_count : (d.playCount || 0);
+            prevTotalCount += count;
         });
 
         const requiredDates = getDatesInRange(new Date(startStr), new Date(endStr));
@@ -174,27 +178,16 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
         const estimatedRevenue = calculateRevenue(franchise || 'personal', totalCount);
         const achievementRate = Math.min((totalCount / 7500) * 100, 100);
 
-        // ✅ 성장률 계산 로직
         let growthRate = 0;
-        let hasPrevData = false; // 기본적으로 없다고 가정
+        let hasPrevData = false; 
 
         if (prevTotalCount > 0) {
-          // 전월 데이터가 있을 때만 계산
           growthRate = ((totalCount - prevTotalCount) / prevTotalCount) * 100;
           hasPrevData = true; 
         } else {
-          // 전월 데이터가 0인 경우 (비교 불가)
           growthRate = 0;
           hasPrevData = false;
         }
-
-        setStats({ 
-          playCount: totalCount, 
-          revenue: estimatedRevenue, 
-          achievementRate: achievementRate,
-          growthRate: growthRate,
-          hasPrevData: hasPrevData // ✅ 상태 업데이트에 포함
-        });
 
         setStats({ 
             playCount: totalCount, 
@@ -227,17 +220,22 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
           const end = new Date(dateRange.end); end.setHours(23,59,59,999);
           
           const historyRef = collection(db, "listening_history");
-          const qHistory = query(historyRef, where("timestamp", ">=", start), where("timestamp", "<=", end));
+          
+          // 🔒 [보안 & 성능 완벽 패치 2] 어드민 재산출 시에도 전체 유저가 아닌 해당 유저 기록만 긁어옵니다.
+          const qHistory = query(
+              historyRef, 
+              where("userId", "==", lastfmId),
+              where("timestamp", ">=", start), 
+              where("timestamp", "<=", end)
+          );
           const historySnap = await getDocs(qHistory);
           
           const uniqueRecords = new Map();
           historySnap.forEach(doc => {
               const d = doc.data();
-              const uid = d.userId || d.user_id;
-              if (uid !== lastfmId) return; 
-
               const utcDate = d.timestamp instanceof Timestamp ? d.timestamp.toDate() : new Date(d.timestamp);
-              const dedupKey = `${uid}|${utcDate.getTime()}`;
+              // 이미 해당 유저 것만 가져왔으므로 uid 확인 로직 생략
+              const dedupKey = `${lastfmId}|${utcDate.getTime()}`;
               
               if (!uniqueRecords.has(dedupKey)) {
                   uniqueRecords.set(dedupKey, { ...d, timestamp: utcDate });
@@ -299,12 +297,31 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
       }
   };
 
-  // 🚨 초기 로딩 대응
+  // ✅ 회원 탈퇴 처리 함수
+  const handleDeleteAccount = async () => {
+    if (!user) return;
+
+    const isConfirmed = confirm("정말로 회원을 탈퇴하시겠습니까?\n이 작업은 되돌릴 수 없으며 모든 정보가 삭제됩니다.");
+    if (!isConfirmed) return;
+
+    try {
+      await deleteUser(user);
+      alert("회원 탈퇴가 정상적으로 완료되었습니다.");
+      router.push("/login"); 
+    } catch (error: any) {
+      console.error("회원 탈퇴 오류:", error);
+      if (error.code === 'auth/requires-recent-login') {
+        alert("보안을 위해 다시 로그인한 후 탈퇴를 진행해주세요.");
+      } else {
+        alert("탈퇴 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+      }
+    }
+  };
+
   if (loading && !storeInfo) {
     return <div style={{ padding: 100, textAlign: "center", color: "#888" }}>⏳ 데이터를 불러오고 있습니다...</div>;
   }
 
-  // 🚨 정보 없음 대응
   if (!storeInfo) {
     return (
       <div style={{ padding: 100, textAlign: "center", color: "white" }}>
@@ -313,8 +330,7 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
       </div>
     );
   }
- 
-  // ✅ 기존 인라인 스타일 UI 복구
+
   return (
     <div style={{ maxWidth: 1000, margin: "0 auto", padding: "20px" }}>
       {/* 어드민 전용 상단 바 */}
@@ -337,14 +353,41 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
         </div>
       )}
 
-      {/* 헤더 */}
-      <header style={{ marginBottom: "30px", borderBottom: "1px solid #333", paddingBottom: "20px" }}>
-        <h2 style={{ fontSize: "24px", fontWeight: "bold", color: "white", marginBottom: "8px" }}>
-          {isAdmin ? `📂 ${storeInfo.store_name} 상세 통계` : `👋 안녕하세요, ${storeInfo.store_name} 점주님!`}
-        </h2>
-        <div style={{ color: "#888", fontSize: "14px" }}>
-          ID: {storeInfo.lastfm_username} | 유형: {storeInfo.franchise === 'seveneleven' ? '세븐일레븐' : '개인/기타'}
+      {/* ✅ 헤더 (버튼 영역 추가됨) */}
+      <header style={{ 
+        display: "flex", 
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        marginBottom: "30px", 
+        borderBottom: "1px solid #333", 
+        paddingBottom: "20px" 
+      }}>
+        <div>
+          <h2 style={{ fontSize: "24px", fontWeight: "bold", color: "white", marginBottom: "8px" }}>
+            {isAdmin ? `📂 ${storeInfo.store_name} 상세 통계` : `👋 안녕하세요, ${storeInfo.store_name} 점주님!`}
+          </h2>
+          <div style={{ color: "#888", fontSize: "14px" }}>
+            ID: {storeInfo.lastfm_username} | 유형: {storeInfo.franchise === 'seveneleven' ? '세븐일레븐' : '개인/기타'}
+          </div>
         </div>
+
+        {/* ✅ 어드민이 아닐 때(일반 점주님일 때)만 설정 버튼들 보이기 */}
+        {!isAdmin && (
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button 
+              onClick={() => router.push("/setup")}
+              style={{ ...secondaryBtnStyle, background: "#374151", color: "white" }}
+            >
+              🔒 비밀번호 변경
+            </button>
+            <button 
+              onClick={handleDeleteAccount}
+              style={{ ...secondaryBtnStyle, background: "rgba(239, 68, 68, 0.1)", color: "#ef4444", border: "1px solid #ef4444" }}
+            >
+              ❌ 회원 탈퇴
+            </button>
+          </div>
+        )}
       </header>
 
       {/* 날짜 컨트롤 */}
@@ -395,25 +438,19 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
         <StatCard title="조회 기간 재생 수" count={`${stats.playCount.toLocaleString()} 곡`} color="#3b82f6" subText="유효 재생수 합계" />
         <StatCard title="예상 정산금" count={`${stats.revenue.toLocaleString()} 원`} color="#10b981" subText="구간별 차등 지급 적용" isHighlight={true} />
         
-        {/* ✅ [신규] 전월 대비 성장률 카드 (인라인 스타일 적용) */}
         <StatCard 
           title="전월 대비 재생 수" 
           count={
             !stats.hasPrevData ? (
-              // 1️⃣ 전월 데이터가 없는 경우
               <span style={{ fontSize: '20px', color: '#9ca3af' }}>-</span>
             ) : (
-              // 2️⃣ 전월 데이터가 있는 경우 (기존 로직)
               <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                 {stats.growthRate > 0 ? '▲' : stats.growthRate < 0 ? '▼' : '-'} 
                 {Math.abs(stats.growthRate).toFixed(1)}%
               </span>
             )
           }
-          // 색상: 데이터 없으면 회색, 있으면 증감에 따라 빨강/파랑
           color={!stats.hasPrevData ? "#9ca3af" : (stats.growthRate >= 0 ? "#ef4444" : "#3b82f6")}
-          
-          // 하단 텍스트: 데이터 없으면 안내 메시지, 있으면 증감 메시지
           subText={
             !stats.hasPrevData 
               ? "전월 기록이 없습니다" 
@@ -424,54 +461,49 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
       </div>
 
       {/* 📈 차트 */}
-<div style={{ background: "#222", padding: "30px", borderRadius: "16px", border: "1px solid #333" }}>
-  <h3 style={{ fontSize: "18px", fontWeight: "bold", color: "white", marginBottom: "20px" }}>📈 일별 재생 추이</h3>
-  <div style={{ height: "300px", width: "100%" }}>
-    <ResponsiveContainer width="100%" height="100%">
-      <LineChart 
-        data={chartData}
-        // 👇 [핵심 수정 1] margin left를 -20 정도로 주어 Y축 공간만큼 당겨옵니다.
-        // right: 10은 마지막 점이 짤리지 않게 여유를 줍니다.
-        margin={{ top: 10, right: 10, left: -5, bottom: 0 }}
-      >
-        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#444" />
-        
-        <XAxis 
-          dataKey="name" 
-          axisLine={false} 
-          tickLine={false} 
-          tick={{ fill: '#888', fontSize: 12 }} 
-          dy={10} 
-          // 👇 X축 양옆에 여백을 살짝 주어 선이 벽에 붙지 않게 함 (선택사항)
-          padding={{ left: 10, right: 10 }} 
-        />
-        
-        <YAxis 
-          axisLine={false} 
-          tickLine={false} 
-          tick={{ fill: '#888', fontSize: 12 }} 
-          // 👇 [핵심 수정 2] Y축 너비를 30~40px로 고정해 불필요한 공백 제거
-          width={40} 
-        />
-        
-        <Tooltip contentStyle={{ backgroundColor: '#333', border: 'none', borderRadius: '8px', color: '#fff' }} />
-        <Line 
-          type="monotone" 
-          dataKey="plays" 
-          stroke="#3b82f6" 
-          strokeWidth={3} 
-          dot={{ r: 4 }} 
-          activeDot={{ r: 6 }} 
-        />
-      </LineChart>
-    </ResponsiveContainer>
-  </div>
-</div>
+      <div style={{ background: "#222", padding: "30px", borderRadius: "16px", border: "1px solid #333" }}>
+        <h3 style={{ fontSize: "18px", fontWeight: "bold", color: "white", marginBottom: "20px" }}>📈 일별 재생 추이</h3>
+        <div style={{ height: "300px", width: "100%" }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart 
+              data={chartData}
+              margin={{ top: 10, right: 10, left: -5, bottom: 0 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#444" />
+              
+              <XAxis 
+                dataKey="name" 
+                axisLine={false} 
+                tickLine={false} 
+                tick={{ fill: '#888', fontSize: 12 }} 
+                dy={10} 
+                padding={{ left: 10, right: 10 }} 
+              />
+              
+              <YAxis 
+                axisLine={false} 
+                tickLine={false} 
+                tick={{ fill: '#888', fontSize: 12 }} 
+                width={40} 
+              />
+              
+              <Tooltip contentStyle={{ backgroundColor: '#333', border: 'none', borderRadius: '8px', color: '#fff' }} />
+              <Line 
+                type="monotone" 
+                dataKey="plays" 
+                stroke="#3b82f6" 
+                strokeWidth={3} 
+                dot={{ r: 4 }} 
+                activeDot={{ r: 6 }} 
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
     </div>
   );
 }
 
-// 스타일 보조 컴포넌트 및 객체 (기존 코드 그대로 복구)
 function StatCard({ title, count, color, subText, isHighlight = false }: any) {
   return (
     <div style={{ background: "#222", padding: "24px", borderRadius: "12px", borderTop: `4px solid ${color}`, boxShadow: isHighlight ? "0 4px 20px rgba(16, 185, 129, 0.1)" : "none" }}>
@@ -481,6 +513,19 @@ function StatCard({ title, count, color, subText, isHighlight = false }: any) {
     </div>
   );
 }
+
+const secondaryBtnStyle = { 
+  padding: "8px 16px", 
+  borderRadius: "6px", 
+  cursor: "pointer", 
+  fontWeight: "bold",
+  fontSize: "13px",
+  border: "none",
+  display: "flex",
+  alignItems: "center",
+  gap: "6px",
+  transition: "opacity 0.2s"
+};
 
 const lastfmBtnStyle = { background: "#333", color: "#ccc", padding: "8px 16px", borderRadius: "8px", textDecoration: "none", fontSize: "13px", border: "1px solid #444", display: "flex", alignItems: "center", gap: "6px" };
 const filterContainerStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", background: "#222", padding: "15px 20px", borderRadius: "12px", border: "1px solid #333" };
