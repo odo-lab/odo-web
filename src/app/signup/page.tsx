@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { auth, db } from "@/lib/firebase";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+// 💡 더 이상 쓰지 않는 getDoc은 빼고, doc과 setDoc만 남겼습니다.
+import { doc, setDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import axios from "axios";
@@ -95,17 +96,15 @@ export default function SignUpPage() {
         return; 
       }
 
-      // 2. 이미 등록된 Last.fm 아이디인지 체크 (중복 방지)
-      const docRef = doc(db, "monitored_users", docId);
-      const docSnap = await getDoc(docRef);
+      // 🚨 2. 이미 등록된 Last.fm 아이디인지 체크 (서버 API를 통한 안전한 중복 방지)
+      // 프론트엔드에서 getDoc을 쓰지 않고, 내 UID(googleUser.uid)를 들고 안전하게 서버에 물어봅니다.
+      const checkResponse = await axios.get(`/api/check-lastfm-id?id=${encodeURIComponent(docId)}&myUid=${googleUser.uid}`);
+      const checkData = checkResponse.data;
 
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        if (data.uid && data.uid !== googleUser.uid) {
-            setError("이미 다른 사용자가 등록한 Last.fm 아이디입니다.");
-            setLoading(false);
-            return;
-        }
+      if (checkData.exists && checkData.isDuplicate) {
+        setError("이미 다른 사용자가 등록한 Last.fm 아이디입니다.");
+        setLoading(false);
+        return;
       }
 
       // 3. Firestore DB에 매장 정보 저장
