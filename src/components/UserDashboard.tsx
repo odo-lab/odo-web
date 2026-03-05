@@ -415,8 +415,8 @@ export default function UserDashboard({ targetId, isAdmin = false }: UserDashboa
                 </h3>
                 <div style={{ color: "#888", fontSize: "13px" }}>목표 7,500곡 / 현재 {stats.playCount.toLocaleString()}곡</div>
             </div>
-            
-            <a href={`https://www.last.fm/user/${storeInfo.id}`} target="_blank" rel="noopener noreferrer" style={lastfmBtnStyle}>
+            {/*https://www.last.fm/user/${storeInfo.id}*/}
+            <a href={`https://www.last.fm/user/${encodeURIComponent(storeInfo.id)}/library?from=${encodeURIComponent(dateRange.start)}&to=${encodeURIComponent(dateRange.end)}`} target="_blank" rel="noopener noreferrer" style={lastfmBtnStyle}>
                 Last.fm 상세
             </a>
         </div>
